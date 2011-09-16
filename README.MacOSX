@@ -1,0 +1,101 @@
+
+Due to popular request, sharktools has been ported to MacOSX.  Compared to
+Linux, however, the installation is more complicated for several reasons:
+
+1) Installation location of libraries on MacOSX doesn't necessarily follow
+   the traditional unix scheme of /usr/lib and /usr/local/lib:  Applications
+   usually come with their libraries located in "bundles", and unix-like
+   systems like fink and MacPorts create files that are sort-of-standard:
+   /sw and /opt/local, respectively.
+
+2) MacOSX has several "standard" Wireshark installation options:
+   * MacPorts
+   * fink
+   * the Wireshark dmg from the wireshark.org website.
+
+3) Although MacOSX runs both 32-bit and 64-bit programs, not all programs
+   and operating environments support the newer 64-bit mode.
+
+   This becomes a problem because 32-bit libraries can't be linked to
+   64-bit libraries (and vice versa), leading to ambiguity as to which
+   libraries should be installed.  Since sharktools integrates wireshark
+   with Python and Matlab, there is a lot of library-to-library linking
+   that needs to be considered.
+
+4) There are several options for libraries that sharktools depends on, like
+   glib2 and libpcap.  These libraries can be installed using:
+   * MacPorts
+   * fink
+
+There are probably other potential complications I haven't encountered.  With
+this in mind, if the following directions don't work (or aren't feasible) on
+your system, please send a bug report to Armen and he'll see what he can do
+to make things work.  Please include as much information as reasonably
+possible.
+
+The directions below are for the following "ideal" configuration:
+* Macports-installed glib2, glib2-devel, wireshark, and wireshark-devel
+* 64-bit Matlab
+* Apple's python (as opposed to fink's)
+
+The above configuration will compile 64-bit tools that work on 64-bit systems.
+An accompanying (sample) ./configure invocation is:
+   $ ./configure --with-wireshark-src=/Users/johndoe/wireshark-1.4.0 --with-mex=/Applications/MATLAB_r2010a.app/bin/mex --with-libwireshark=/opt/local/lib/libwireshark.dylib
+
+NB: You can still install Wireshark from MacPorts even if you have a version
+of Wireshark from the Wireshark dmg file presented on www.wireshark.org, and
+vice-versa.  However, we currently discourage use of the libraries included
+with the Wireshark.app application because they (as of this writing) contain
+incorrect linking information (see bug #5292 on bugs.wireshark.org).
+
+NB: I don't recommend using fink because of two main problems:
+* It suggests that you compile create a 32-bit installation on a 64-bit system
+  simply because there are more packages available in the 32-bit side of fink.
+  It's really just easier to go to 64-bit.
+* It contains old software (Current wireshark release is 1.4.1, and fink
+  presents 1.2.6)
+
+NB: Matlab has the ability to run in both 32-bit mode and 64-bit mode: This
+  option can be toggled through the Matlab's "Get Info" box in MacOSX's Finder.
+  Also, use the computer('arch') command in Matlab to find out what mode your
+  Matlab is running in.
+
+Installation instructions
+
+Please read the installation instructions in the README file to get an idea of
+the install process - installing in MacOSX is somewhat similar.
+
+1) Install Apple's XCode.  This can be obtained from CDs that come with your
+   MacOSX system, or can be alternatively downloaded from developer.apple.com
+   (after creating a free account there).  Run Software Update to make sure
+   you have the newest XCode package offered by Apple.
+
+   XCode presents gcc, g++, libtool (different from GNU libtool!), flex, bison,
+   and other things needed to install Wireshark.
+
+2) Install MacPorts: www.macports.org
+
+3) Install several packages from MacPorts:
+
+$ port install glib2 glib2-devel libpcap wireshark wireshark-devel
+
+NB: This takes a long time.  Feel free to step away from your desk for a few
+   hours or overnight.
+
+4) Make note of the version of wireshark that MacPorts just installed by
+   running:
+
+   $ port list|grep wireshark
+
+   Follow Step 4 of the directions listed in the README file regarding
+   downloading Wireshark source and ./configure'ing it.
+
+4) (Optional - needed for matshark) Install Matlab.
+
+5) Configure your sharktools using some variation of the "./configure"
+   invocation quoted above.
+
+6) Run "make" and move the resulting pyshark.so and matshark.mexmaci{64} to the
+   appropriate paths.
+
+As mentioned before, please email bug reports to Armen.

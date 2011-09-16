@@ -1,0 +1,33 @@
+Sharktools ChangeLog
+
+version 0.1.6 (2011/06/06):
+* updated documentation and test cases
+
+version 0.1.5 (2010/10/13):
+* ported build system from scons to autotools, primarily due to complexity of MacOSX
+configuration
+* Improved MacOSX support
+* Improved Ubuntu support
+* Updated documentation to reflect change from scons to autotools
+
+version 0.1.4 (2010/09/27):
+* Improved MacOSX support (both pyshark and matshark)
+* Updated MacOSX documentation in README file
+
+version 0.1.3 (2010/09/24):
+* added support for Wireshark 1.4.0
+* backported wireshark 1.4.0 features for simplicity
+* fixed an array size creation bug in matshark
+* fixed native_type conversion bug
+* fixed support for boolean field types
+* added pkg-config support into the build
+* updated documentation examples
+* updated test invocations
+	
+version 0.1.1 (2010/09/14):
+* fixed minor inefficiency in {py,mat}shark.c
+* fixed frame.time_delta_displayed
+* fixed test invocations
+	
+version 0.1 (2010/09/08):
+* Initial release

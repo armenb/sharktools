@@ -1,0 +1,15 @@
++ set -e
++ PYTHON=python
++ export PYTHONPATH=../src
++ PYTHONPATH=../src
++ test -e ../src/pyshark.so
++ python -c 'import pyshark; b = pyshark.read('\''capture1.pcap'\'', [ '\''frame.number'\'', '\''ip.version'\'', '\''tcp.seq'\'', '\''udp.dstport'\'', '\''frame.len'\'' ], '\''ip.version eq 4'\''); print b[2]'
+{'frame.number': 6, 'tcp.seq': None, 'frame.len': 60, 'udp.dstport': 60000, 'ip.version': 4}
++ python -c 'import pyshark; b = pyshark.read('\''capture1.pcap'\'', [ '\''frame.number'\'', '\''ip.version'\'', '\''tcp.seq'\'', '\''udp.dstport'\'', '\''frame.len'\'' ], '\''ip.version eq 4'\'', '\''udp.port==60000,aodv'\''); print b[2]'
+{'frame.number': 6, 'tcp.seq': None, 'frame.len': 60, 'udp.dstport': 60000, 'ip.version': 4}
++ python -c 'import pyshark; c = pyshark.read('\''capture1.pcap'\'', [ '\''frame.number'\'', '\''frame.time'\'', '\''frame.time_relative'\'', '\''frame.len'\'', '\''frame.protocols'\'' ], '\'''\'' ); print c[8]'
+{'frame.number': 9, 'frame.len': 60, 'frame.time': 1066402442.768941, 'frame.time_relative': 0.022801999999999999, 'frame.protocols': 'eth:ip:udp:data'}
++ python -c 'import pyshark; c = pyshark.read('\''capture1.pcap'\'', [ '\''frame.number'\'', '\''frame.time'\'', '\''frame.time_delta'\'', '\''frame.time_delta_displayed'\'', '\''frame.time_relative'\'', '\''frame.len'\'', '\''frame.cap_len'\'', '\''frame.marked'\'', '\''frame.protocols'\'' ], '\''ip'\'' ); print c[2]'
+{'frame.number': 6, 'frame.time_delta': 0.0013370000000000001, 'frame.time_delta_displayed': 0.010801, 'frame.time': 1066402442.758747, 'frame.marked': False, 'frame.time_relative': 0.012607999999999999, 'frame.cap_len': 60, 'frame.len': 60, 'frame.protocols': 'eth:ip:udp:data'}
++ python -c 'import pyshark; c = pyshark.read('\''capture1.pcap'\'', [ '\''frame.number'\'', '\''eth.lg'\'', '\''eth.ig'\'', '\''eth.trailer'\'', '\''ip.version'\'', '\''ip.dsfield.dscp'\'', '\''ip.dsfield.ect'\'', '\''ip.dsfield.ce'\'', '\''ip.len'\'', '\''ip.id'\'', '\''ip.flags.rb'\'', '\''ip.flags.df'\'', '\''ip.flags.mf'\'', '\''ip.frag_offset'\'', '\''ip.ttl'\'', '\''ip.proto'\'', '\''ip.checksum'\'', '\''ip.checksum_good'\'', '\''ip.checksum_bad'\'', '\''data.data'\'', '\''ip.hdr_len'\'' ], '\''ip'\'' ); print c[6]'
+{'frame.number': 17, 'data.data': '02:22:01:0c:d5:05:00:00:04:1a:c2:c2:e3:db:45:40:fd:66:f7:3c:5c:11:52:c0:4e:ed', 'ip.hdr_len': 20, 'ip.dsfield.dscp': 0, 'ip.frag_offset': 0, 'eth.lg': False, 'ip.checksum_good': True, 'ip.dsfield.ect': 0, 'ip.id': 19257, 'ip.checksum_bad': False, 'ip.flags.rb': False, 'eth.trailer': None, 'eth.ig': False, 'ip.flags.df': False, 'ip.checksum': 32979, 'ip.ttl': 1, 'ip.proto': 17, 'ip.flags.mf': False, 'ip.len': 881, 'ip.dsfield.ce': 0, 'ip.version': 4}

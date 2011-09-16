@@ -1,0 +1,110 @@
++ set -e
++ export MATLABPATH=../src
++ MATLABPATH=../src
++ test -e ../src/matshark.mexa64
++ matlab -nodisplay -nojvm -r 'b = matshark('\''capture1.pcap'\'', { '\''frame.number'\'', '\''ip.version'\'', '\''tcp.seq'\'', '\''udp.dstport'\'', '\''frame.len'\'' }, '\''ip.version eq 4'\''); display(b(3)); pause(1e-6); exit'
+[?1h=
+                                                                                    < M A T L A B (R) >
+                                                                          Copyright 1984-2010 The MathWorks, Inc.
+                                                                        Version 7.10.0.499 (R2010a) 64-bit (glnxa64)
+                                                                                      February 5, 2010
+
+ 
+  To get started, type one of these: helpwin, helpdesk, or demo.
+  For product information, visit www.mathworks.com.
+ 
+>>     frame_number: 6
+      ip_version: 4
+         tcp_seq: []
+     udp_dstport: 60000
+       frame_len: 60
+
+[?1l>+ matlab -nodisplay -nojvm -r 'b = matshark('\''capture1.pcap'\'', { '\''frame.number'\'', '\''ip.version'\'', '\''tcp.seq'\'', '\''udp.dstport'\'', '\''frame.len'\'' }, '\''ip.version eq 4'\'', '\''udp.port==60000,aodv'\''); display(b(3)); pause(1e-6); exit'
+[?1h=
+                                                                                    < M A T L A B (R) >
+                                                                          Copyright 1984-2010 The MathWorks, Inc.
+                                                                        Version 7.10.0.499 (R2010a) 64-bit (glnxa64)
+                                                                                      February 5, 2010
+
+ 
+  To get started, type one of these: helpwin, helpdesk, or demo.
+  For product information, visit www.mathworks.com.
+ 
+>>     frame_number: 6
+      ip_version: 4
+         tcp_seq: []
+     udp_dstport: 60000
+       frame_len: 60
+
+[?1l>+ matlab -nodisplay -nojvm -r 'c = matshark('\''capture1.pcap'\'', { '\''frame.number'\'', '\''frame.time'\'', '\''frame.time_relative'\'', '\''frame.len'\'', '\''frame.protocols'\'' }, '\'''\'' ); display(c(9)); pause(1e-6); exit'
+[?1h=
+                                                                                    < M A T L A B (R) >
+                                                                          Copyright 1984-2010 The MathWorks, Inc.
+                                                                        Version 7.10.0.499 (R2010a) 64-bit (glnxa64)
+                                                                                      February 5, 2010
+
+ 
+  To get started, type one of these: helpwin, helpdesk, or demo.
+  For product information, visit www.mathworks.com.
+ 
+>>            frame_number: 9
+             frame_time: 1.0664e+09
+    frame_time_relative: 0.0228
+              frame_len: 60
+        frame_protocols: 'eth:ip:udp:data'
+
+[?1l>+ matlab -nodisplay -nojvm -r 'c = matshark('\''capture1.pcap'\'', { '\''frame.number'\'', '\''frame.time'\'', '\''frame.time_delta'\'', '\''frame.time_delta_displayed'\'', '\''frame.time_relative'\'', '\''frame.len'\'', '\''frame.cap_len'\'', '\''frame.marked'\'', '\''frame.protocols'\'' }, '\''ip.version eq 4'\''); display(c(3)); pause(1e-6); exit'
+[?1h=
+                                                                                    < M A T L A B (R) >
+                                                                          Copyright 1984-2010 The MathWorks, Inc.
+                                                                        Version 7.10.0.499 (R2010a) 64-bit (glnxa64)
+                                                                                      February 5, 2010
+
+ 
+  To get started, type one of these: helpwin, helpdesk, or demo.
+  For product information, visit www.mathworks.com.
+ 
+>>                   frame_number: 6
+                    frame_time: 1.0664e+09
+              frame_time_delta: 0.0013
+    frame_time_delta_displayed: 0.0108
+           frame_time_relative: 0.0126
+                     frame_len: 60
+                 frame_cap_len: 60
+                  frame_marked: 0
+               frame_protocols: 'eth:ip:udp:data'
+
+[?1l>+ matlab -nodisplay -nojvm -r 'c = matshark('\''capture1.pcap'\'', { '\''frame.number'\'', '\''eth.lg'\'', '\''eth.ig'\'', '\''eth.trailer'\'', '\''ip.version'\'', '\''ip.dsfield.dscp'\'', '\''ip.dsfield.ect'\'', '\''ip.dsfield.ce'\'', '\''ip.len'\'', '\''ip.id'\'', '\''ip.flags.rb'\'', '\''ip.flags.df'\'', '\''ip.flags.mf'\'', '\''ip.frag_offset'\'', '\''ip.ttl'\'', '\''ip.proto'\'', '\''ip.checksum'\'', '\''ip.checksum_good'\'', '\''ip.checksum_bad'\'', '\''data.data'\'', '\''ip.hdr_len'\'' }, '\''ip'\'' ); display(c(7)); pause(1e-6); exit'
+[?1h=
+                                                                                    < M A T L A B (R) >
+                                                                          Copyright 1984-2010 The MathWorks, Inc.
+                                                                        Version 7.10.0.499 (R2010a) 64-bit (glnxa64)
+                                                                                      February 5, 2010
+
+ 
+  To get started, type one of these: helpwin, helpdesk, or demo.
+  For product information, visit www.mathworks.com.
+ 
+>>         frame_number: 17
+              eth_lg: 0
+              eth_ig: 0
+         eth_trailer: []
+          ip_version: 4
+     ip_dsfield_dscp: 0
+      ip_dsfield_ect: 0
+       ip_dsfield_ce: 0
+              ip_len: 881
+               ip_id: 19257
+         ip_flags_rb: 0
+         ip_flags_df: 0
+         ip_flags_mf: 0
+      ip_frag_offset: 0
+              ip_ttl: 1
+            ip_proto: 17
+         ip_checksum: 32979
+    ip_checksum_good: 1
+     ip_checksum_bad: 0
+           data_data: '02:22:01:0c:d5:05:00:00:04:1a:c2:c2:e3:db:45:40:fd:66:f7:3c:5c:11:52:c0:4e:ed'
+          ip_hdr_len: 20
+
+[?1l>
