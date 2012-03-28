@@ -44,6 +44,19 @@
 #define WS_VAR_IMPORT extern
 #include <epan/ftypes/ftypes.h>
 
+#ifndef HAVE_STDARG_H
+#define HAVE_STDARG_H /* for using stdarg.h instead of varargs.h */
+#endif //HAVE_STDARG_H
+
+/* APB: If we're running pre-1.4.0, include back-ported functions that are not
+ * available pre-1.4.0
+ */
+#if (WIRESHARK_0_99_5 || WIRESHARK_1_0_0 || WIRESHARK_1_2_0)
+#include "sharktools_epan.h"
+#include "sharktools_frame_data.h"
+#include "sharktools_cfile.h"
+#endif //(WIRESHARK_0_99_5 || WIRESHARK_1_0_0 || WIRESHARK_1_2_0)
+
 typedef struct _ret_info {
   GPtrArray *values;
   GArray *types;
@@ -58,6 +71,58 @@ typedef struct sharktools_callbacks {
   gpointer (*row_add)(struct sharktools_callbacks *cb, gpointer row);
 } sharktools_callbacks;
 
+/**
+ * This structure holds Sharktools-specific data that is routed through
+ * libwireshark's callback system.
+ * 
+ * It is worth noting that fields and field_indices are calculated
+ * once per execution of sharktools, while field_values and field_types
+ * are updated once per packet processed.
+ */
+typedef struct
+{
+  gulong nfields;
+
+  /**
+   * 'fields' holds an ordered list of keys (strings) that are field names
+   * of interest, e.g. 'frame.number' or 'ip.len'
+   */
+  GPtrArray* fields;
+
+  /**
+   * 'field_indicies' holds a mappings of hash(key) => integer, where the
+   * integer describes the key's order in 'fields'.
+   * (This is necessary to avoid lots of string compares later)
+   */
+  GHashTable* field_indicies;
+
+  /**
+   * 'field_values_str' holds an ordered list of values (strings) found for
+   * a particular packet.
+   */
+  const gchar** field_values_str;
+
+  fvalue_t **field_values_native;
+
+  /**
+   * 'field_types' holds an ordered list of data types (enum, in
+   * epan/ftypes/ftypes.h) for each respective value in 'field_values_str'
+   */
+  gulong *field_types; // AB: added to original _output_fields datatype in print.c
+
+  /* NB: iterator support */
+
+  capture_file cfile;
+  //gchar *cf_name;
+  //char *dfilter;
+  dfilter_t *rfcode;
+
+  gchar        *err_info;
+  gint64       data_offset;
+
+
+} st_data_t;
+
 char sharktools_errmsg[2048];
 
 int sharktools_preload_libs(void);
@@ -68,8 +133,15 @@ int sharktools_cleanup(void);
 long sharktools_add_decode_as(char *s);
 long sharktools_remove_decode_as(char *s);
 long sharktools_count(char *filename, char *dfilter);
+
 long sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
                        gchar *dfilter, sharktools_callbacks *cb);
+
+st_data_t *sharktools_iter_init(gchar *filename, gulong nfields, const gchar **fields, gchar *dfilterorig);
+gboolean sharktools_iter_next(st_data_t *stdata);
+gint sharktools_iter_cleanup(st_data_t *stdata);
+
+
 
 
 

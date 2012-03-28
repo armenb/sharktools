@@ -99,45 +99,6 @@
 #endif
 
 /**
- * This structure holds Sharktools-specific data that is routed through
- * libwireshark's callback system.
- * 
- * It is worth noting that fields and field_indices are calculated
- * once per execution of sharktools, while field_values and field_types
- * are updated once per packet processed.
- */
-typedef struct
-{
-  /**
-   * 'fields' holds an ordered list of keys (strings) that are field names
-   * of interest, e.g. 'frame.number' or 'ip.len'
-   */
-  GPtrArray* fields;
-
-  /**
-   * 'field_indicies' holds a mappings of hash(key) => integer, where the
-   * integer describes the key's order in 'fields'.
-   * (This is necessary to avoid lots of string compares later)
-   */
-  GHashTable* field_indicies;
-
-  /**
-   * 'field_values_str' holds an ordered list of values (strings) found for
-   * a particular packet.
-   */
-  const gchar** field_values_str;
-
-  fvalue_t **field_values_native;
-
-  /**
-   * 'field_types' holds an ordered list of data types (enum, in
-   * epan/ftypes/ftypes.h) for each respective value in 'field_values_str'
-   */
-  gulong *field_types; // AB: added to original _output_fields datatype in print.c
-
-} st_data_t;
-
-/**
  * This structure exists solely because libwireshark's libraries have callback
  * mechanisms accept one argument for the user-specified function, and we want
  * both the stdata structure and the edt tree passed to our specified function.
@@ -1186,6 +1147,136 @@ glong sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
   cfile.wth = NULL;
 
   stdata_cleanup(&stdata);
+
+  dprintf("%s: ...leaving.\n", __FUNCTION__);
+
+  return 0;
+}
+
+/* Functions to use for languages that natively support iterators (e.g. Python) */
+
+st_data_t *
+sharktools_iter_init(gchar *filename, gulong nfields, const gchar **fields,
+                     gchar *dfilterorig)
+{
+  // create stdata structure
+  // open pcap file
+  // return stdata
+
+  //gsize i;
+  //capture_file cfile;
+  gchar *cf_name = NULL;
+  char *dfilter;
+  dfilter_t *rfcode = NULL;
+
+  st_data_t *stdata = (st_data_t *)malloc(sizeof(st_data_t));
+  
+  stdata->nfields = nfields;
+  stdata->rfcode = NULL;
+
+  dprintf("%s: entering...\n", __FUNCTION__);
+
+  dprintf("%s: dfilterorig: %s\n", __FUNCTION__, dfilterorig);
+
+  dfilter = strdup(dfilterorig);
+
+  dprintf("%s: dfilter: %s\n", __FUNCTION__, dfilter);
+
+  if(!dfilter_compile(dfilter, &(stdata->rfcode)))
+    {
+      sprintf(errmsg, "%s", dfilter_error_msg);
+      printf("errmsg");
+      if(stdata->rfcode)
+        dfilter_free(stdata->rfcode);
+      return (st_data_t*)-1;  // XXX fix this return value
+    }
+
+  // Defined in cfile.c, looks easy enough to use
+  cap_file_init(&(stdata->cfile));
+
+  cf_name = filename;
+
+  // Open pcap file
+  int err;
+  if(cf_open(&(stdata->cfile), cf_name, FALSE, &err) != CF_OK)
+    {
+      //sprintf(errmsg, "%s", dfilter_error_msg);
+      if(rfcode)
+        dfilter_free(rfcode);
+      return (st_data_t*)-1;  // XXX fix this return value
+    }
+
+  dprintf("nfields = %ld\n", nfields);
+
+  stdata_init(stdata, nfields);
+
+  stdata_add_fields(stdata, fields, nfields);
+
+  dprintf("stdata->fields->len = %d\n", stdata->fields->len);
+
+  dprintf("stdata->field_values_str = %lX\n", (glong)stdata->field_values_str);
+  dprintf("stdata->field_types = %lX\n", (glong)stdata->field_types);
+  
+  dprintf("%s: opened file\n", __FUNCTION__);
+
+  stdata->cfile.rfcode = rfcode;
+
+  return stdata;
+}
+
+
+gboolean
+sharktools_iter_next(st_data_t *stdata)
+{
+  /*
+    Continue reading the file to find a matched packet
+    or else return something signifying that we're done
+    (i.e. something that translates into StopIteration exception in Python
+  */
+
+  // Read and process each packet one at a time
+  int err; // XXX useful??
+  while(wtap_read(stdata->cfile.wth, &err, &(stdata->err_info), &(stdata->data_offset)))
+    {
+      dprintf("*******************************\n");
+
+      // (Re)-set all the stdata->field_{values,types} fields
+      // FIXME: does this actually need to be done?
+      int i;
+      for(i = 0; i < stdata->nfields; i++)
+        {
+          stdata->field_values_str[i] = 0;
+          stdata->field_types[i] = FT_NONE;
+        }
+
+      gboolean passed = FALSE;
+      
+      passed = process_packet(&(stdata->cfile), stdata->data_offset, stdata);
+
+      if(passed)
+	{
+          /*
+            NB: If passed is true, then stdata->field_{types,values_native,values_str}
+            contain a matched packet's data
+            by returning 1, we let our calling environment know there's data
+            for it to read.
+          */
+          return TRUE;
+        }
+    }
+
+  return FALSE; // something signifying a StopIteration exception
+}
+
+gint
+sharktools_iter_cleanup(st_data_t *stdata)
+{
+  if(stdata->rfcode)
+    dfilter_free(stdata->rfcode);
+  wtap_close(stdata->cfile.wth);
+  stdata->cfile.wth = NULL;
+
+  stdata_cleanup(stdata);
 
   dprintf("%s: ...leaving.\n", __FUNCTION__);
 
