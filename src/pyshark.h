@@ -1,7 +1,3 @@
-
-
-
-
 #ifndef PYSHARK_H
 #define PYSHARK_H
 
@@ -10,32 +6,24 @@
 
 typedef struct {
   PyObject_HEAD
+  gboolean clean;
   char *decode_as;
   st_data_t *stdata;
   PyObject **keyobjs;
-} pyshark_MyIter;
+} pyshark_Iter;
 
+static PyObject *pyshark_iter(PyObject *self, PyObject *args);
 
-
-static PyObject *pyshark_myiter(PyObject *self, PyObject *args);
-
-PyObject *pyshark_getDict(pyshark_MyIter *p);
-
+PyObject *pyshark_getDict(pyshark_Iter *p);
 PyObject *pyshark_getValueForKey(PyObject *keyobj, gulong type, fvalue_t *val_native, const gchar *val_string);
 
-PyObject *pyshark_MyIter_iter(PyObject *self);
+// Functions to be registered in PyTypeObject struct
+PyObject *pyshark_Iter_iter(PyObject *self);
+PyObject* pyshark_Iter_iternext(PyObject *self);
+void pyshark_Iter_dealloc(PyObject *self);
 
-PyObject* pyshark_MyIter_iternext(PyObject *self);
-
-void pyshark_iter_cleanup(pyshark_MyIter *p);
+void pyshark_iter_cleanup(pyshark_Iter *p);
 
 PyMODINIT_FUNC initpyshark(void);
-
-
-
-
-
-
-
 
 #endif //PYSHARK_H

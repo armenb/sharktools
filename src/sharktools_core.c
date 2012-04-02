@@ -1155,8 +1155,9 @@ glong sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
 
 /* Functions to use for languages that natively support iterators (e.g. Python) */
 
-st_data_t *
-sharktools_iter_init(gchar *filename, gulong nfields, const gchar **fields,
+glong
+sharktools_iter_init(st_data_t *stdata,
+                     gchar *filename, gulong nfields, const gchar **fields,
                      gchar *dfilterorig)
 {
   // create stdata structure
@@ -1169,8 +1170,6 @@ sharktools_iter_init(gchar *filename, gulong nfields, const gchar **fields,
   char *dfilter;
   dfilter_t *rfcode = NULL;
 
-  st_data_t *stdata = (st_data_t *)malloc(sizeof(st_data_t));
-  
   stdata->nfields = nfields;
   stdata->rfcode = NULL;
 
@@ -1188,7 +1187,7 @@ sharktools_iter_init(gchar *filename, gulong nfields, const gchar **fields,
       printf("errmsg");
       if(stdata->rfcode)
         dfilter_free(stdata->rfcode);
-      return (st_data_t*)-1;  // XXX fix this return value
+      return -1;
     }
 
   // Defined in cfile.c, looks easy enough to use
@@ -1203,7 +1202,7 @@ sharktools_iter_init(gchar *filename, gulong nfields, const gchar **fields,
       //sprintf(errmsg, "%s", dfilter_error_msg);
       if(rfcode)
         dfilter_free(rfcode);
-      return (st_data_t*)-1;  // XXX fix this return value
+      return -1;
     }
 
   dprintf("nfields = %ld\n", nfields);
@@ -1221,7 +1220,7 @@ sharktools_iter_init(gchar *filename, gulong nfields, const gchar **fields,
 
   stdata->cfile.rfcode = rfcode;
 
-  return stdata;
+  return 0;
 }
 
 

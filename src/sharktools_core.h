@@ -137,7 +137,8 @@ long sharktools_count(char *filename, char *dfilter);
 long sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
                        gchar *dfilter, sharktools_callbacks *cb);
 
-st_data_t *sharktools_iter_init(gchar *filename, gulong nfields, const gchar **fields, gchar *dfilterorig);
+
+glong sharktools_iter_init(st_data_t *stdata, gchar *filename, gulong nfields, const gchar **fields, gchar *dfilterorig);
 gboolean sharktools_iter_next(st_data_t *stdata);
 gint sharktools_iter_cleanup(st_data_t *stdata);
 

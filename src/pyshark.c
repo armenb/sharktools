@@ -74,13 +74,13 @@ extern char sharktools_errmsg[2048];
 #define dprintf(args...) ((void)0)
 #endif
 
-static PyTypeObject pyshark_MyIterType = {
+static PyTypeObject pyshark_IterType = {
     PyObject_HEAD_INIT(NULL)
     0,                         /*ob_size*/
-    "pyshark._MyIter",            /*tp_name*/
-    sizeof(pyshark_MyIter),       /*tp_basicsize*/
+    "pyshark._Iter",            /*tp_name*/
+    sizeof(pyshark_Iter),       /*tp_basicsize*/
     0,                         /*tp_itemsize*/
-    0,                         /*tp_dealloc*/
+    pyshark_Iter_dealloc,    /*tp_dealloc*/
     0,                         /*tp_print*/
     0,                         /*tp_getattr*/
     0,                         /*tp_setattr*/
@@ -98,26 +98,26 @@ static PyTypeObject pyshark_MyIterType = {
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER,
       /* tp_flags: Py_TPFLAGS_HAVE_ITER tells python to
          use tp_iter and tp_iternext fields. */
-    "Internal myiter iterator object.",           /* tp_doc */
+    "Internal iter iterator object.",           /* tp_doc */
     0,  /* tp_traverse */
     0,  /* tp_clear */
     0,  /* tp_richcompare */
     0,  /* tp_weaklistoffset */
-    pyshark_MyIter_iter,  /* tp_iter: __iter__() method */
-    pyshark_MyIter_iternext  /* tp_iternext: next() method */
+    pyshark_Iter_iter,  /* tp_iter: __iter__() method */
+    pyshark_Iter_iternext  /* tp_iternext: next() method */
 };
 
 static PyObject *PysharkError;
 
 static PyObject *
-pyshark_myiter(PyObject *self, PyObject *args)
+pyshark_iter(PyObject *self, PyObject *args)
 {
   char *filename;
   PyObject *fieldnamelist;
   const char *dfilter;
   char *decode_as = NULL;
 
-  //int ret;
+  gint ret;
   
   if(!PyArg_ParseTuple(args, "sOs|s", &filename, &fieldnamelist, &dfilter, &decode_as))
     {
@@ -137,6 +137,7 @@ pyshark_myiter(PyObject *self, PyObject *args)
   fieldnames = g_new(char*, nfields);
 
   long size = -1;
+
 
   gsize i;
   for(i = 0; i < nfields; i++)
@@ -158,59 +159,74 @@ pyshark_myiter(PyObject *self, PyObject *args)
       fieldnames[i][size-1] = 0; // Null terminate the string
     }
 
-
-  pyshark_MyIter *p;
-  p = PyObject_New(pyshark_MyIter, &pyshark_MyIterType);
+  pyshark_Iter *p;
+  p = PyObject_New(pyshark_Iter, &pyshark_IterType);
   if(!p)
-    return NULL;
+    {
+      return NULL;
+    }
 
-  /* I'm not sure if it's strictly necessary. */
-  if(!PyObject_Init((PyObject *)p, &pyshark_MyIterType))
+  if(!PyObject_Init((PyObject *)p, &pyshark_IterType))
     {
       Py_DECREF(p);
       return NULL;
     }
 
-  p->stdata->nfields = nfields;
-
   // Create the array of key objects
   p->keyobjs = g_new(PyObject *, nfields);
 
-  int j;
-  for(j = 0; j < nfields; j++)
+  for(i = 0; i < nfields; i++)
     {
-      //keyobjs[j] = Py_BuildValue("s", fieldnames[j]);
-      p->keyobjs[j] = Py_BuildValue("s#", fieldnames[j], strlen(fieldnames[j]));
+      p->keyobjs[i] = Py_BuildValue("s#", fieldnames[i], strlen(fieldnames[i]));
     }
 
-  /* I don't need python callable __init__() method for this iterator,
-     so I'll simply allocate it as PyObject and initialize it by hand. */
-
-  // If there is a decode_as string set
-  // Add the decode_as string
+  p->decode_as = NULL;
+  /* If there is a decode_as string set, add it */
   if(decode_as)
     {
-      sharktools_add_decode_as(decode_as);
+      ret = sharktools_add_decode_as(decode_as);
+      if(ret == FALSE)
+        {
+          dprintf("%s\n", sharktools_errmsg);
+          PyErr_SetString(PysharkError, sharktools_errmsg);
+          return NULL;
+        }
       // NB: need to know the existence of this so we remember to remove it later
       p->decode_as = strndup(decode_as, strlen(decode_as));
     }
-  else
-    {
-      p->decode_as = NULL;
-    }
   
-  p->stdata = sharktools_iter_init(filename, nfields, (const gchar**)fieldnames, strdup(dfilter));
+  /*
+   * Create and initialize sharktools' state
+   */
+  p->stdata = (st_data_t *)malloc(sizeof(st_data_t));
+  
+  ret = sharktools_iter_init(p->stdata, filename, nfields, (const gchar**)fieldnames, strdup(dfilter));
+  if(ret < 0)
+    {
+      dprintf("%s\n", sharktools_errmsg);
+      PyErr_SetString(PysharkError, sharktools_errmsg);
+      return NULL;
+    }
 
+  p->stdata->nfields = nfields;
+
+  /*
+    Don't need these anymore; they've been copied into p->stdata;
+   */
   for(i = 0; i < p->stdata->nfields; i++)
     {
       g_free(fieldnames[i]);
     }
   g_free(fieldnames);
 
+  // Specify that iterator object needs to be explicitly deallocated
+  p->clean = FALSE;
+
   return (PyObject *)p;
 }
 
-PyObject *pyshark_getDict(pyshark_MyIter *p)
+PyObject *
+pyshark_getDict(pyshark_Iter *p)
 {
   PyObject *dictobj = PyDict_New();
   int i;
@@ -232,8 +248,9 @@ PyObject *pyshark_getDict(pyshark_MyIter *p)
           return NULL;
         }
       
-      // NB: PyDict_SetItem does not take over ownership,
-      // so we explicitly need to disown valueobj.
+      /* NB: PyDict_SetItem does not take over ownership,
+         so we explicitly need to disown valueobj.
+      */
       Py_DECREF(valueobj);
     }
   
@@ -336,16 +353,28 @@ pyshark_getValueForKey(PyObject *keyobj, gulong type, fvalue_t *val_native, cons
 
   return valueobj;
 }
-//////////////////////////////////////////////////////////////////////////////////////////////////////
-PyObject *pyshark_MyIter_iter(PyObject *self)
+
+/*
+ * pyshark_Iter_iter() is intended to be registered as
+ * PyTypeObject.tp_iter
+ */
+PyObject *
+pyshark_Iter_iter(PyObject *self)
 {
+  //printf("%s\n", __FUNCTION__);
   Py_INCREF(self);
   return self;
 }
 
-PyObject* pyshark_MyIter_iternext(PyObject *self)
+/*
+ * pyshark_Iter_iternext() is intended to be registered as
+ * PyTypeObject.tp_iternext
+ */
+PyObject *
+pyshark_Iter_iternext(PyObject *self)
 {
-  pyshark_MyIter *p = (pyshark_MyIter *)self;
+  //printf("%s\n", __FUNCTION__);
+  pyshark_Iter *p = (pyshark_Iter *)self;
 
   gboolean pkt_exists = sharktools_iter_next(p->stdata);
   
@@ -356,44 +385,93 @@ PyObject* pyshark_MyIter_iternext(PyObject *self)
     }
   else
     {
-      sharktools_iter_cleanup(p->stdata);
+      /* We're done with the iterator, and hence, and {pyshark,sharktools}-specific
+       * data, so run the cleanup routine.
+       * 
+       * NB: We also call this in pyshark_Iter_dealloc().
+       * NB: This is called to aggressively remove the decode_as string, if set.
+       */
       pyshark_iter_cleanup(p);
-      /* Raising of standard StopIteration exception with empty value. */
+
+      /* Raise a standard StopIteration exception with empty value. */
       PyErr_SetNone(PyExc_StopIteration);
+
       return NULL;
     }
 }
 
-void pyshark_iter_cleanup(pyshark_MyIter *p)
+/*
+ * pyshark_Iter_dealloc() is intended to be registered as
+ * PyTypeObject.tp_dealloc
+ */
+void
+pyshark_Iter_dealloc(PyObject *self)
 {  
-  // Remove the decode_as string (otherwise, since the setting is global,
-  // It will persist across calls to this function
-  if(p->decode_as)
+  //printf("%s\n", __FUNCTION__);
+
+  /* Assuming self is not NULL, lets try deleting {pyshark,sharktools}-specific
+   * data.  
+   * NB: it may have already been deleted when we hit the end of the iterator
+   */
+  pyshark_Iter *p = (pyshark_Iter*)self;
+  pyshark_iter_cleanup(p);
+
+  Py_DECREF(self);
+}
+
+void
+pyshark_iter_cleanup(pyshark_Iter *p)
+{
+  gint ret;
+
+  /* NB: this function can be called from the pyshark_Iter object's
+     destructor, OR from running to the end of the Python iterator.
+   */
+  if(p->clean == TRUE)
     {
-      sharktools_remove_decode_as(p->decode_as);
+      // Already cleaned up; we're done
+      return;
     }
 
-  //dprintf("sharktools_get done\n");
+  sharktools_iter_cleanup(p->stdata);
+
+  g_free(p->stdata);
+  p->stdata = NULL;
+
+  /* Remove the decode_as string (otherwise, since the setting is global,
+     It will persist across calls to this function
+  */
+  if(p->decode_as)
+    {
+      ret = sharktools_remove_decode_as(p->decode_as);
+
+      // Deallocate the decode_as string
+      g_free(p->decode_as);
+
+      if(ret == FALSE)
+        {
+
+          // Generate the pyshark.error exception
+          dprintf("%s\n", sharktools_errmsg);
+          PyErr_SetString(PysharkError, sharktools_errmsg);
+          return;
+        }
+    }
 
   // NB: Don't need to free each key because these are in the returned list
   g_free(p->keyobjs);
 
-  /*
-    XXX THIS NEEDS FIXING.
-
-  if(ret)
-    {
-      dprintf("%s\n", sharktools_errmsg);
-      PyErr_SetString(PysharkError, sharktools_errmsg);
-      return NULL;
-    }
+  /* NB: All (pyshark,sharktools}-specific data should
+     be deallocated at this point.
   */
+  p->clean = TRUE;
+
   return;
 }
 
 static PyMethodDef PysharkMethods[] = {
-  {"read",  pyshark_myiter, METH_VARARGS, "Returns a pyshark iterator"},
-  {"myiter",  pyshark_myiter, METH_VARARGS, "Return a pyshark iterator"},
+  {"read",  pyshark_iter, METH_VARARGS, "Returns a pyshark iterator"},
+  {"iter",  pyshark_iter, METH_VARARGS, "Return a pyshark iterator"},
 
   {NULL, NULL, 0, NULL}        /* Sentinel */
 };
@@ -408,8 +486,8 @@ static void log_func_ignore (const gchar *log_domain, GLogLevelFlags log_level,
 PyMODINIT_FUNC
 initpyshark(void)
 {
-  pyshark_MyIterType.tp_new = PyType_GenericNew;
-  if (PyType_Ready(&pyshark_MyIterType) < 0)
+  pyshark_IterType.tp_new = PyType_GenericNew;
+  if (PyType_Ready(&pyshark_IterType) < 0)
     return;
 
   // Create the pyshark module
