@@ -364,6 +364,28 @@ static void stdata_init(st_data_t* stdata, gulong nfields)
 
 }
 
+static void stdata_init2(st_data_t* stdata, gulong nfields)
+{
+  gsize i;
+
+  /* Prepare a lookup table from string abbreviation for field to its index. */
+  stdata->field_indicies = g_hash_table_new(g_str_hash, g_str_equal);
+
+  // APB: We use g_new() here. ep_alloc_array0() is the wrong function to use because
+  // it only allocates for a single packet lifetime, as described in epan/emem.c
+
+  /* Buffers to store types and values for each packet */
+  stdata->field_values_str = g_new(const gchar*, nfields);
+
+  stdata->field_values_native = g_new(fvalue_t*, nfields);
+  for(i = 0; i < nfields; i++)
+    {
+      stdata->field_values_native[i] = g_new(fvalue_t, 1);
+    }
+
+  stdata->field_types = g_new(gulong, nfields);
+}
+
 /**
  * Here we cleanup stdata by deallocating it's members in reverse order of 
  * allocation.
@@ -404,6 +426,49 @@ static void stdata_cleanup(st_data_t* stdata)
 }
 
 /**
+ * Here we cleanup stdata by deallocating it's members in reverse order of 
+ * allocation.
+ */
+static void stdata_cleanup2(st_data_t* stdata)
+{
+  gsize i;
+
+  g_assert(stdata);
+  
+  if(stdata->field_types)
+    g_free(stdata->field_types);
+
+  if(stdata->field_values_native)
+    {
+      for(i = 0; i < stdata->fields->len; i++)
+        {
+          g_free(stdata->field_values_native[i]);
+        }
+      g_free(stdata->field_values_native);
+    }
+
+  if(stdata->field_values_str)
+    g_free(stdata->field_values_str);
+
+  if(stdata->field_indicies)
+    {
+      /* Keys are stored in stdata->fields, values are
+       * integers.
+       */
+      g_hash_table_destroy(stdata->field_indicies);
+    }
+
+
+  /*
+  for(i = 0; i < stdata->fields->len; ++i)
+    {
+      gchar* field = g_ptr_array_index(stdata->fields,i);
+      g_free(field);
+    }
+  */
+}
+
+/**
  * This function adds <fields> to the stdata data structure:  it copies the strings directly,
  * and it sets up the field_indicies hashtable.
  */
@@ -438,6 +503,24 @@ static void stdata_add_fields(st_data_t* stdata, const gchar** fields, gsize nfi
     }
 #endif
 
+}
+
+static void compute_hashes_from_fieldnames(GHashTable *fieldname_indicies, const GPtrArray* fieldnames)
+{
+  gsize i;
+
+  g_assert(fieldname_indicies);
+  g_assert(fieldnames);
+  
+  for(i = 0; i < fieldnames->len; i++)
+    {
+      //dprintf("adding outputfield: %s\n", fieldnames[i]);
+      //stdata_add(&stdata, fields[i]);
+      gpointer fieldname = g_ptr_array_index(fieldnames, i);
+
+      // Add to hashtable
+      g_hash_table_insert(fieldname_indicies, fieldname, (gulong *)(i));
+    }
 }
 
 static const guint8 *get_field_data(GSList *src_list, field_info *fi)
@@ -1157,20 +1240,28 @@ glong sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
 
 glong
 sharktools_iter_init(st_data_t *stdata,
-                     gchar *filename, gulong nfields, const gchar **fields,
-                     gchar *dfilterorig)
+                     gchar *filename, const GPtrArray *fieldnames, gchar *dfilterorig)
 {
   // create stdata structure
   // open pcap file
   // return stdata
 
-  //gsize i;
-  //capture_file cfile;
+  stdata_init2(stdata, fieldnames->len);
+
+  stdata->fields = (GPtrArray *)fieldnames;
+
+  compute_hashes_from_fieldnames(stdata->field_indicies, fieldnames);
+
+  dprintf("stdata->fields->len = %d\n", stdata->fields->len);
+
+  dprintf("stdata->field_values_str = %lX\n", (glong)stdata->field_values_str);
+  dprintf("stdata->field_types = %lX\n", (glong)stdata->field_types);
+  
   gchar *cf_name = NULL;
   char *dfilter;
   dfilter_t *rfcode = NULL;
 
-  stdata->nfields = nfields;
+  //stdata->nfields = nfields;
   stdata->rfcode = NULL;
 
   dprintf("%s: entering...\n", __FUNCTION__);
@@ -1205,20 +1296,11 @@ sharktools_iter_init(st_data_t *stdata,
       return -1;
     }
 
-  dprintf("nfields = %ld\n", nfields);
-
-  stdata_init(stdata, nfields);
-
-  stdata_add_fields(stdata, fields, nfields);
-
-  dprintf("stdata->fields->len = %d\n", stdata->fields->len);
-
-  dprintf("stdata->field_values_str = %lX\n", (glong)stdata->field_values_str);
-  dprintf("stdata->field_types = %lX\n", (glong)stdata->field_types);
-  
   dprintf("%s: opened file\n", __FUNCTION__);
 
+  //XXX why are there two??
   stdata->cfile.rfcode = rfcode;
+  stdata->rfcode = rfcode;
 
   return 0;
 }
@@ -1272,10 +1354,13 @@ sharktools_iter_cleanup(st_data_t *stdata)
 {
   if(stdata->rfcode)
     dfilter_free(stdata->rfcode);
-  wtap_close(stdata->cfile.wth);
-  stdata->cfile.wth = NULL;
+  if(stdata->cfile.wth)
+    {
+      wtap_close(stdata->cfile.wth);
+      stdata->cfile.wth = NULL;
+    }
 
-  stdata_cleanup(stdata);
+  stdata_cleanup2(stdata);
 
   dprintf("%s: ...leaving.\n", __FUNCTION__);
 

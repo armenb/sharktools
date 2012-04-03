@@ -107,58 +107,46 @@ static PyTypeObject pyshark_IterType = {
     pyshark_Iter_iternext  /* tp_iternext: next() method */
 };
 
-static PyObject *PysharkError;
+static PyObject *PySharkError;
 
 static PyObject *
 pyshark_iter(PyObject *self, PyObject *args)
 {
+  gsize i;
   char *filename;
-  PyObject *fieldnamelist;
+  PyObject *keylistobj;
   const char *dfilter;
   char *decode_as = NULL;
 
   gint ret;
   
-  if(!PyArg_ParseTuple(args, "sOs|s", &filename, &fieldnamelist, &dfilter, &decode_as))
+  // NB: Automatic sanity checks for 1st, 3rd, and optional 4th argument
+  if(!PyArg_ParseTuple(args, "sOs|s", &filename, &keylistobj, &dfilter, &decode_as))
     {
-      //PyErrPysharkError;
       return NULL;
     }
 
-  // Check to make sure the list is a Python list.
-  if(!PyList_Check(fieldnamelist))
+  // NB: Explicit sanity checks needed for the second argument
+  if(!PyList_Check(keylistobj))
     {
-      PyErr_SetString(PysharkError, "Second argument must be a list of wireshark fields");
+      PyErr_SetString(PyExc_TypeError, "Second argument must be a list of wireshark fieldnames");
       return NULL;
     }
-
-  long nfields = PyList_Size(fieldnamelist);
-  gchar **fieldnames;
-  fieldnames = g_new(char*, nfields);
-
-  long size = -1;
-
-
-  gsize i;
+  long nfields = PyList_Size(keylistobj);
   for(i = 0; i < nfields; i++)
     {
-      PyObject *fieldname = PyList_GetItem(fieldnamelist, i);
+      PyObject *fieldnameobj = PyList_GetItem(keylistobj, i);
 
-      if(!PyString_Check(fieldname))
+      if(!PyString_Check(fieldnameobj))
         {
-          //Error!
-          // XXX memory cleanup
+          PyErr_SetString(PyExc_TypeError, "All items in second argument list must be strings");
           return NULL;
         }
-
-      // Returns length minus termination character, so add 1.
-      size = PyString_Size(fieldname) + 1;
-
-      fieldnames[i] = g_new(gchar, size);
-      strncpy(fieldnames[i], PyString_AsString(fieldname), size-1);
-      fieldnames[i][size-1] = 0; // Null terminate the string
     }
 
+  /*
+    Create our iterator object
+  */
   pyshark_Iter *p;
   p = PyObject_New(pyshark_Iter, &pyshark_IterType);
   if(!p)
@@ -166,21 +154,41 @@ pyshark_iter(PyObject *self, PyObject *args)
       return NULL;
     }
 
+  /*
+    Initialize all our data structures in the iterator object to 0. This makes it easier
+    to implement deallocation logic for both expected and unexpected cases.
+   */
+  p->clean = FALSE;
+  p->decode_as = NULL;
+  p->stdata = NULL;
+  p->fieldnames = NULL;
+  p->keylist = NULL;
+
   if(!PyObject_Init((PyObject *)p, &pyshark_IterType))
     {
       Py_DECREF(p);
       return NULL;
     }
+  
+  // NB: Keep a copy of the second argument as a native PyList object (which
+  // contains PyStrings)
+  p->keylist = keylistobj;
+  Py_INCREF(p->keylist);
 
-  // Create the array of key objects
-  p->keyobjs = g_new(PyObject *, nfields);
-
+  // NB: Convert PyList of PyStrings to array of char *'s for sharktools
+  p->fieldnames = g_ptr_array_new();
   for(i = 0; i < nfields; i++)
     {
-      p->keyobjs[i] = Py_BuildValue("s#", fieldnames[i], strlen(fieldnames[i]));
+      // NB: we know these are not NULL because of our sanity checks above
+      PyObject *keyobj = PyList_GetItem(p->keylist, i);
+
+      g_ptr_array_add(p->fieldnames, PyString_AsString(keyobj));
+
+      // NB: Since the above array_add() call doesn't deep copy the fieldname,
+      // let's increment the refcount, and decrement it when we cleanup
+      Py_INCREF(keyobj);
     }
 
-  p->decode_as = NULL;
   /* If there is a decode_as string set, add it */
   if(decode_as)
     {
@@ -188,38 +196,31 @@ pyshark_iter(PyObject *self, PyObject *args)
       if(ret == FALSE)
         {
           dprintf("%s\n", sharktools_errmsg);
-          PyErr_SetString(PysharkError, sharktools_errmsg);
+          PyErr_SetString(PySharkError, sharktools_errmsg);
+          Py_DECREF(p);
           return NULL;
         }
-      // NB: need to know the existence of this so we remember to remove it later
+      // NB: Add to object state; we'll need to remove it later
       p->decode_as = strndup(decode_as, strlen(decode_as));
     }
   
   /*
    * Create and initialize sharktools' state
    */
-  p->stdata = (st_data_t *)malloc(sizeof(st_data_t));
+  p->stdata = g_new0(st_data_t, 1);
   
-  ret = sharktools_iter_init(p->stdata, filename, nfields, (const gchar**)fieldnames, strdup(dfilter));
+  ret = sharktools_iter_init(p->stdata, filename, p->fieldnames, strdup(dfilter));
   if(ret < 0)
     {
       dprintf("%s\n", sharktools_errmsg);
-      PyErr_SetString(PysharkError, sharktools_errmsg);
+      PyErr_SetString(PySharkError, sharktools_errmsg);
+      Py_DECREF(p);
       return NULL;
     }
 
   p->stdata->nfields = nfields;
 
-  /*
-    Don't need these anymore; they've been copied into p->stdata;
-   */
-  for(i = 0; i < p->stdata->nfields; i++)
-    {
-      g_free(fieldnames[i]);
-    }
-  g_free(fieldnames);
-
-  // Specify that iterator object needs to be explicitly deallocated
+  // NB: We are dirty
   p->clean = FALSE;
 
   return (PyObject *)p;
@@ -232,19 +233,16 @@ pyshark_getDict(pyshark_Iter *p)
   int i;
 
   // For each of the keys we are looking to extract values for
-  for(i = 0; i < p->stdata->nfields; i++)
+  long nfields = PyList_Size(p->keylist);
+  for(i = 0; i < nfields; i++)
     {
-      PyObject *valueobj;
-
-      gulong type = p->stdata->field_types[i];
-      fvalue_t *val_native = p->stdata->field_values_native[i];
-      const gchar *val_string = p->stdata->field_values_str[i];
-
-      valueobj = pyshark_getValueForKey(p->keyobjs[i], type, val_native, val_string);
+      PyObject *keyobj = PyList_GetItem(p->keylist, i);
+      PyObject *valueobj = pyshark_getValueByIndex(p->stdata, i);
       
-      if(PyDict_SetItem(dictobj, p->keyobjs[i], valueobj) != 0)
+      if(PyDict_SetItem(dictobj, keyobj, valueobj) != 0)
         {
-          PyErr_SetString(PysharkError, "Adding key/value pair to dictionary failed\n");
+          PyErr_SetString(PySharkError, "Adding key/value pair to dictionary failed\n");
+          // XXX memory cleanup
           return NULL;
         }
       
@@ -258,8 +256,12 @@ pyshark_getDict(pyshark_Iter *p)
 }
 
 PyObject*
-pyshark_getValueForKey(PyObject *keyobj, gulong type, fvalue_t *val_native, const gchar *val_string)
+pyshark_getValueByIndex(st_data_t *stdata, int i)
 {
+  gulong type = stdata->field_types[i];
+  fvalue_t *val_native = stdata->field_values_native[i];
+  const gchar *val_string = stdata->field_values_str[i];
+
   PyObject *valueobj = NULL;
 
   // A-priori variable declarations (because we can't declare these inline in a switch statement)
@@ -422,6 +424,7 @@ pyshark_Iter_dealloc(PyObject *self)
 void
 pyshark_iter_cleanup(pyshark_Iter *p)
 {
+  gsize i;
   gint ret;
 
   /* NB: this function can be called from the pyshark_Iter object's
@@ -433,10 +436,15 @@ pyshark_iter_cleanup(pyshark_Iter *p)
       return;
     }
 
-  sharktools_iter_cleanup(p->stdata);
+  if(p->stdata)
+    {
+      sharktools_iter_cleanup(p->stdata);
+      g_free(p->stdata);
+      p->stdata = NULL;
+    }
 
-  g_free(p->stdata);
-  p->stdata = NULL;
+  if(p->fieldnames)
+    g_ptr_array_free(p->fieldnames, FALSE);
 
   /* Remove the decode_as string (otherwise, since the setting is global,
      It will persist across calls to this function
@@ -447,19 +455,30 @@ pyshark_iter_cleanup(pyshark_Iter *p)
 
       // Deallocate the decode_as string
       g_free(p->decode_as);
+      p->decode_as = NULL;
 
       if(ret == FALSE)
         {
-
           // Generate the pyshark.error exception
           dprintf("%s\n", sharktools_errmsg);
-          PyErr_SetString(PysharkError, sharktools_errmsg);
+          PyErr_SetString(PySharkError, sharktools_errmsg);
           return;
         }
     }
 
-  // NB: Don't need to free each key because these are in the returned list
-  g_free(p->keyobjs);
+  if(p->keylist)
+    {
+      long nfields = PyList_Size(p->keylist);
+      for(i = 0; i < nfields; i++)
+        {
+          PyObject *key = PyList_GetItem(p->keylist, i);
+          // NB: This DECREF is for the PyString_AsString() calls, where we did NOT
+          // copy the strings
+          Py_DECREF(key);
+        }
+      Py_DECREF(p->keylist);
+      p->keylist = NULL;
+    }
 
   /* NB: All (pyshark,sharktools}-specific data should
      be deallocated at this point.
@@ -469,8 +488,8 @@ pyshark_iter_cleanup(pyshark_Iter *p)
   return;
 }
 
-static PyMethodDef PysharkMethods[] = {
-  {"read",  pyshark_iter, METH_VARARGS, "Returns a pyshark iterator"},
+static PyMethodDef PySharkMethods[] = {
+  {"read",  pyshark_iter, METH_VARARGS, "Return a pyshark iterator"},
   {"iter",  pyshark_iter, METH_VARARGS, "Return a pyshark iterator"},
 
   {NULL, NULL, 0, NULL}        /* Sentinel */
@@ -492,14 +511,14 @@ initpyshark(void)
 
   // Create the pyshark module
   PyObject *m;
-  m = Py_InitModule("pyshark", PysharkMethods);
+  m = Py_InitModule("pyshark", PySharkMethods);
   if (m == NULL)
     return;
 
   // Create pyshark-specific Exception
-  PysharkError = PyErr_NewException("pyshark.error", NULL, NULL);
-  Py_INCREF(PysharkError);
-  PyModule_AddObject(m, "error", PysharkError);
+  PySharkError = PyErr_NewException("pyshark.PySharkError", NULL, NULL);
+  Py_INCREF(PySharkError);
+  PyModule_AddObject(m, "PySharkError", PySharkError);
 
 #if DEBUG==0
   GLogLevelFlags       log_flags;

@@ -6,16 +6,17 @@
 
 typedef struct {
   PyObject_HEAD
-  gboolean clean;
+  gboolean clean; // NB: specifies whether or not the dealloc routine has been called
   char *decode_as;
   st_data_t *stdata;
-  PyObject **keyobjs;
+  GPtrArray *fieldnames;
+  PyObject *keylist;
 } pyshark_Iter;
 
 static PyObject *pyshark_iter(PyObject *self, PyObject *args);
 
 PyObject *pyshark_getDict(pyshark_Iter *p);
-PyObject *pyshark_getValueForKey(PyObject *keyobj, gulong type, fvalue_t *val_native, const gchar *val_string);
+PyObject *pyshark_getValueByIndex(st_data_t *stdata, int i);
 
 // Functions to be registered in PyTypeObject struct
 PyObject *pyshark_Iter_iter(PyObject *self);
