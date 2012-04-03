@@ -68,44 +68,6 @@ struct protocol_name_search{
 typedef struct protocol_name_search *protocol_name_search_t;
 
 /*
- * For a dissector table, print on the stream described by output,
- * its short name (which is what's used in the "-d" option) and its
- * descriptive name.
- */
-static void
-display_dissector_table_names(const char *table_name, const char *ui_name,
-                              gpointer output)
-{
-  fprintf((FILE *)output, "\t%s (%s)\n", table_name, ui_name);
-}
-
-/*
- * For a dissector handle, print on the stream described by output,
- * the filter name (which is what's used in the "-d" option) and the full
- * name for the protocol that corresponds to this handle.
- */
-static void
-display_dissector_names(const gchar *table, gpointer handle, gpointer output)
-{
-  int                proto_id;
-  const gchar*       proto_filter_name;
-  const gchar*       proto_ui_name;
-
-  proto_id = dissector_handle_get_protocol_index((dissector_handle_t)handle);
-
-  if (proto_id != -1) {
-    proto_filter_name = proto_get_protocol_filter_name(proto_id);
-    proto_ui_name =  proto_get_protocol_name(proto_id);
-    g_assert(proto_filter_name != NULL);
-    g_assert(proto_ui_name != NULL);
-
-    fprintf((FILE *)output, "\t%s (%s)\n",
-            proto_filter_name,
-            proto_ui_name);
-  }
-}
-
-/*
  * This function parses all dissectors associated with a table to find the
  * one whose protocol has the specified filter name.  It is called
  * as a reference function in a call to dissector_table_foreach_handle.
@@ -139,33 +101,6 @@ find_protocol_name_func(const gchar *table, gpointer handle, gpointer user_data)
       search_info->nb_match++;
     }
   }
-}
-
-/*
- * Print all layer type names supported.
- * We send the output to the stream described by the handle output.
- */
-
-static void
-fprint_all_layer_types(FILE *output)
-
-{
-  dissector_all_tables_foreach_table(display_dissector_table_names, (gpointer)output);
-}
-
-/*
- * Print all protocol names supported for a specific layer type.
- * table_name contains the layer type name in which the search is performed.
- * We send the output to the stream described by the handle output.
- */
-
-static void
-fprint_all_protocols_for_layer_types(FILE *output, gchar *table_name)
-
-{
-  dissector_table_foreach_handle(table_name,
-                                 display_dissector_names,
-                                 (gpointer)output);
 }
 
 /*
@@ -237,10 +172,7 @@ add_decode_as(const gchar *cl_param)
   }
 
   if (!table_matching) {
-    /* Display a list of supported layer types to help the user, if the
-       specified layer type was not found */
-    sprintf(sharktools_errmsg, "Valid layer types are:");
-    fprint_all_layer_types(stderr);
+    sprintf(sharktools_errmsg, "Specified layer type not found");
   }
   if (remaining_param == NULL || !table_matching) {
     /* Exit if the layer type was not found, or if no '=' separator was found
@@ -307,8 +239,7 @@ add_decode_as(const gchar *cl_param)
 
   if (remaining_param == NULL) {
     /* Exit if no ',' separator was found (see above) */
-    sprintf(sharktools_errmsg, "Valid protocols for layer type \"%s\" are:", table_name);
-    fprint_all_protocols_for_layer_types(stderr, table_name);
+    sprintf(sharktools_errmsg, "no ',' separator was found");
     g_free(decoded_param);
     return FALSE;
   }
@@ -361,8 +292,7 @@ add_decode_as(const gchar *cl_param)
   }
 
   if (!dissector_matching) {
-    sprintf(sharktools_errmsg, "Valid protocols for layer type \"%s\" are:", table_name);
-    fprint_all_protocols_for_layer_types(stderr, table_name);
+    sprintf(sharktools_errmsg, "No matching dissector found");
     g_free(decoded_param);
     return FALSE;
   }
@@ -483,10 +413,7 @@ remove_decode_as(const gchar *cl_param)
   }
 
   if (!table_matching) {
-    /* Display a list of supported layer types to help the user, if the
-       specified layer type was not found */
-    sprintf(sharktools_errmsg, "Valid layer types are:");
-    fprint_all_layer_types(stderr);
+    sprintf(sharktools_errmsg, "Specified layer type not found");
   }
   if (remaining_param == NULL || !table_matching) {
     /* Exit if the layer type was not found, or if no '=' separator was found
@@ -553,8 +480,7 @@ remove_decode_as(const gchar *cl_param)
 
   if (remaining_param == NULL) {
     /* Exit if no ',' separator was found (see above) */
-    sprintf(sharktools_errmsg, "Valid protocols for layer type \"%s\" are:", table_name);
-    fprint_all_protocols_for_layer_types(stderr, table_name);
+    sprintf(sharktools_errmsg, "no ',' separator was found");
     g_free(decoded_param);
     return FALSE;
   }
@@ -607,8 +533,7 @@ remove_decode_as(const gchar *cl_param)
   }
 
   if (!dissector_matching) {
-    sprintf(sharktools_errmsg, "Valid protocols for layer type \"%s\" are:", table_name);
-    fprint_all_protocols_for_layer_types(stderr, table_name);
+    sprintf(sharktools_errmsg, "No matching dissector found");
     g_free(decoded_param);
     return FALSE;
   }
