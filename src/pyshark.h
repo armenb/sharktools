@@ -16,7 +16,9 @@ typedef struct {
 static PyObject *pyshark_iter(PyObject *self, PyObject *args);
 
 PyObject *pyshark_getDict(pyshark_Iter *p);
-PyObject *pyshark_getValueByIndex(st_data_t *stdata, int i);
+//PyObject *pyshark_getValueByIndex(st_data_t *stdata, int i);
+PyObject *pyshark_getValueObjFromTree(gulong type, GPtrArray* tree_values);
+
 
 // Functions to be registered in PyTypeObject struct
 PyObject *pyshark_Iter_iter(PyObject *self);

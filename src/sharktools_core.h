@@ -67,7 +67,8 @@ typedef struct sharktools_callbacks {
   gpointer* keys;
   gulong count;
   gpointer (*row_new)(struct sharktools_callbacks *cb);
-  gpointer (*row_set)(struct sharktools_callbacks *cb, gpointer row, gpointer key, gulong type, fvalue_t *val_native,  const gchar *val_string);
+  //gpointer (*row_set)(struct sharktools_callbacks *cb, gpointer row, gpointer key, gulong type, fvalue_t *val_native,  const gchar *val_string);
+  gpointer (*row_set)(struct sharktools_callbacks *cb, gpointer row, gpointer key, gulong type, GPtrArray* tree_values);
   gpointer (*row_add)(struct sharktools_callbacks *cb, gpointer row);
 } sharktools_callbacks;
 
@@ -97,12 +98,10 @@ typedef struct
   GHashTable* field_indicies;
 
   /**
-   * 'field_values_str' holds an ordered list of values (strings) found for
+   * 'tree_values' holds an ordered list of values found for
    * a particular packet.
    */
-  const gchar** field_values_str;
-
-  fvalue_t **field_values_native;
+  GPtrArray* tree_values;
 
   /**
    * 'field_types' holds an ordered list of data types (enum, in

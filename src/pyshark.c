@@ -1,4 +1,4 @@
-/* Copyright (c) 2007-2011
+/* Copyright (c) 2007-2012
  *      Massachusetts Institute of Technology
  *
  * This program is free software; you can redistribute it and/or
@@ -108,6 +108,69 @@ static PyTypeObject pyshark_IterType = {
 };
 
 static PyObject *PySharkError;
+
+gpointer format_field(gpointer item, gchar *format)
+{
+  if( strcmp(format,"s") == 0 )
+    {
+      return Py_BuildValue( format, item );
+    }
+  else if( strcmp(format,"T") == 0 )
+    {
+      nstime_t *tmp_timestamp = fvalue_get( item );
+      // Use fn in $wireshark/epan/nstime.c to convert timestamp to a float
+      double tmp_double = nstime_to_sec(tmp_timestamp);
+      return Py_BuildValue("f", tmp_double);
+      // XXX FIXME: create a Python-native time or timedelta object instead.
+    }
+  else if( strcmp(format,"f") == 0 )
+    {
+      double tmp_double = fvalue_get_floating( item );
+      return Py_BuildValue(format, tmp_double);
+    }
+  else if( strcmp(format,"K") == 0 )
+    {
+      unsigned long long tmp_unsigned_long_long = fvalue_get_integer64( item );
+      return Py_BuildValue(format, tmp_unsigned_long_long);
+    }
+  else if( strcmp(format,"i") == 0 )
+    {
+      /* FIXME: does fvalue_get_sinteger() work properly with FT_INT{8,16,24} types? */
+      unsigned long tmp_long = fvalue_get_sinteger( item );
+      return Py_BuildValue(format, tmp_long);
+    }
+  else if( strcmp(format,"k") == 0 )
+    {
+      unsigned long tmp_unsigned_long = fvalue_get_uinteger( item );
+      return Py_BuildValue(format, tmp_unsigned_long);
+    }
+  else if( strcmp(format,"B") == 0 )
+    {
+      /* Wireshark implements FT_BOOLEANs as uintegers. See epan/ftype/ftype-integer.c */
+      unsigned long tmp_unsigned_long = fvalue_get_uinteger( item );
+      return PyBool_FromLong(tmp_unsigned_long);
+    }
+  else
+    return NULL;
+}
+
+gpointer cb_field_set(GPtrArray* tree_values, gchar *format)
+{
+  if(tree_values->len == 1)
+    {
+      return format_field(g_ptr_array_index(tree_values,0), format);
+    }
+  else
+    {
+      gint i;
+      PyObject* valueobj = PyList_New((long)0);
+      for(i = 0; i < tree_values->len; ++i)
+        {
+          PyList_Append(valueobj, format_field(g_ptr_array_index(tree_values,i), format));
+        }
+      return valueobj;
+    }
+}
 
 static PyObject *
 pyshark_iter(PyObject *self, PyObject *args)
@@ -237,7 +300,11 @@ pyshark_getDict(pyshark_Iter *p)
   for(i = 0; i < nfields; i++)
     {
       PyObject *keyobj = PyList_GetItem(p->keylist, i);
-      PyObject *valueobj = pyshark_getValueByIndex(p->stdata, i);
+
+      gulong type = p->stdata->field_types[i];
+      GPtrArray* tree_values = g_ptr_array_index( p->stdata->tree_values, i);
+
+      PyObject *valueobj = pyshark_getValueObjFromTree(type, tree_values);
       
       if(PyDict_SetItem(dictobj, keyobj, valueobj) != 0)
         {
@@ -255,21 +322,21 @@ pyshark_getDict(pyshark_Iter *p)
   return dictobj;
 }
 
+/*
 PyObject*
 pyshark_getValueByIndex(st_data_t *stdata, int i)
 {
   gulong type = stdata->field_types[i];
+
+  GPtrArray* tree_values = stdata->tree_values[i];
   fvalue_t *val_native = stdata->field_values_native[i];
   const gchar *val_string = stdata->field_values_str[i];
+*/
 
+PyObject*
+pyshark_getValueObjFromTree(gulong type, GPtrArray* tree_values)
+{
   PyObject *valueobj = NULL;
-
-  // A-priori variable declarations (because we can't declare these inline in a switch statement)
-  static unsigned long tmp_unsigned_long;
-  static unsigned long long tmp_unsigned_long_long;
-  static long tmp_long;
-  static double tmp_double;
-  static nstime_t *tmp_timestamp;
 
   /**
    * More info on the Python type converted to is here:
@@ -284,9 +351,7 @@ pyshark_getValueByIndex(st_data_t *stdata, int i)
       break;
 
     case FT_BOOLEAN:	/* TRUE and FALSE come from <glib.h> */
-      /* Wireshark implements FT_BOOLEANs as uintegers. See epan/ftype/ftype-integer.c */
-      tmp_unsigned_long = fvalue_get_uinteger(val_native);
-      valueobj = PyBool_FromLong(tmp_unsigned_long);
+      valueobj = cb_field_set( tree_values, "B" );
       break;
 
     case FT_FRAMENUM:  /* a UINT32, but if selected lets you go to frame with that numbe */
@@ -297,43 +362,30 @@ pyshark_getValueByIndex(st_data_t *stdata, int i)
     case FT_UINT16:
     case FT_UINT24:	/* really a UINT32, but displayed as 3 hex-digits if FD_HEX*/
     case FT_UINT32:
-      /* FIXME: does fvalue_get_uinteger() work properly with FT_UINT{8,16,24} types? */
-      tmp_unsigned_long = fvalue_get_uinteger(val_native);
-      valueobj = Py_BuildValue("k", tmp_unsigned_long);
+      valueobj = cb_field_set( tree_values, "k" );
       break;
 
     case FT_INT8:
     case FT_INT16:
     case FT_INT24:	/* same as for UINT24 */
     case FT_INT32:
-      /* FIXME: does fvalue_get_sinteger() work properly with FT_INT{8,16,24} types? */
-      tmp_long = fvalue_get_sinteger(val_native);
-      valueobj = Py_BuildValue("i", tmp_long);
+      valueobj = cb_field_set( tree_values, "i" );
       break;
 
     case FT_INT64:
       /* Wireshark doesn't seem to make a difference between INT64 and UINT64 */
     case FT_UINT64:
-      tmp_unsigned_long_long = fvalue_get_integer64(val_native);
-      valueobj = Py_BuildValue("K", tmp_unsigned_long_long);
+      valueobj = cb_field_set( tree_values, "K" );
       break;
 
     case FT_FLOAT:
     case FT_DOUBLE:
-      tmp_double = fvalue_get_floating(val_native);
-      valueobj = Py_BuildValue("f", tmp_double);
+      valueobj = cb_field_set( tree_values, "f" );
       break;
 
     case FT_ABSOLUTE_TIME:
     case FT_RELATIVE_TIME:
-      {
-        tmp_timestamp = fvalue_get(val_native);
-        // Use fn in $wireshark/epan/nstime.c to convert timestamp to a float
-        tmp_double = nstime_to_sec(tmp_timestamp);
-        
-        valueobj = Py_BuildValue("f", tmp_double);
-        // XXX FIXME: create a Python-native time or timedelta object instead.
-      }
+      valueobj = cb_field_set( tree_values, "T" );
       break;
 
     // Convert all the rest to strings:
@@ -348,8 +400,7 @@ pyshark_getValueByIndex(st_data_t *stdata, int i)
     //case FT_GUID:		/* GUID, UUID */
     //case FT_OID:			/* OBJECT IDENTIFIER */
     default:
-      valueobj = Py_BuildValue("s", val_string);
-      dprintf("pyshark val_string: %s\n", val_string);
+      valueobj = cb_field_set( tree_values, "s" );
       break;
     }
 
@@ -383,6 +434,16 @@ pyshark_Iter_iternext(PyObject *self)
   if(pkt_exists)
     {
       PyObject *tmp = pyshark_getDict(p);
+
+      //reset tree_values
+      g_ptr_array_free( p->stdata->tree_values, TRUE);
+      p->stdata->tree_values = g_ptr_array_new();
+      gsize i;
+      for(i = 0; i < p->stdata->fields->len; i++)
+        {
+          g_ptr_array_add( p->stdata->tree_values, g_ptr_array_new() ); 
+        }
+
       return tmp;
     }
   else
