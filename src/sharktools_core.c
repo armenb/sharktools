@@ -334,7 +334,7 @@ static void stdata_init(st_data_t* stdata, gulong nfields)
   //stdata->field_values_str = NULL;
   //stdata->field_types = NULL;
 
-  stdata->fields = g_ptr_array_new();
+  stdata->fieldnames = g_ptr_array_new();
   //stdata->fields = g_ptr_array_sized_new(nfields);
 
   /**
@@ -362,9 +362,12 @@ static void stdata_init(st_data_t* stdata, gulong nfields)
 
 }
 
-static void stdata_init2(st_data_t* stdata, gulong nfields)
+static void stdata_init2(st_data_t* stdata)
 {
   gsize i;
+
+  // NB: fieldnames is *already* initialized by our caller
+  gulong nfields = stdata->fieldnames->len;
 
   /* Prepare a lookup table from string abbreviation for field to its index. */
   stdata->field_indicies = g_hash_table_new(g_str_hash, g_str_equal);
@@ -380,6 +383,10 @@ static void stdata_init2(st_data_t* stdata, gulong nfields)
     }
 
   stdata->field_types = g_new(gulong, nfields);
+
+  stdata->wtree_types = g_hash_table_new(g_str_hash, g_str_equal);
+  stdata->wtree_values = g_hash_table_new(g_str_hash, g_str_equal);
+
 }
 
 /**
@@ -394,7 +401,7 @@ static void stdata_cleanup(st_data_t* stdata)
   
   g_free(stdata->field_types);
 
-  for(i = 0; i < stdata->fields->len; i++)
+  for(i = 0; i < stdata->fieldnames->len; i++)
     {
       g_ptr_array_free( g_ptr_array_index(stdata->tree_values, i), TRUE);
      }
@@ -409,13 +416,13 @@ static void stdata_cleanup(st_data_t* stdata)
       g_hash_table_destroy(stdata->field_indicies);
     }
 
-  for(i = 0; i < stdata->fields->len; ++i)
+  for(i = 0; i < stdata->fieldnames->len; ++i)
     {
-      gchar* field = g_ptr_array_index(stdata->fields,i);
+      gchar* field = g_ptr_array_index(stdata->fieldnames, i);
       g_free(field);
     }
 
-  g_ptr_array_free(stdata->fields, TRUE);
+  g_ptr_array_free(stdata->fieldnames, TRUE);
 
 
 }
@@ -435,7 +442,7 @@ static void stdata_cleanup2(st_data_t* stdata)
 
   if(stdata->tree_values)
     {
-      for(i = 0; i < stdata->fields->len; i++)
+      for(i = 0; i < stdata->fieldnames->len; i++)
         {
           g_ptr_array_free( g_ptr_array_index(stdata->tree_values, i), TRUE);
         }
@@ -480,7 +487,7 @@ static void stdata_add_fields(st_data_t* stdata, const gchar** fields, gsize nfi
       field_copy = g_strdup(fields[i]);
   
       // Add to fields
-      g_ptr_array_add(stdata->fields, field_copy);
+      g_ptr_array_add(stdata->fieldnames, field_copy);
 
       // Add to hashtable
       g_hash_table_insert(stdata->field_indicies, field_copy, (gulong *)(i));
@@ -599,72 +606,166 @@ static inline gboolean is_native_type(gulong type)
  */
 static void proto_tree_get_node_field_values(proto_node *node, gpointer data)
 {
-  stdata_edt_tuple_t *args;
+  stdata_edt_tuple_t *args = data;
+  st_data_t *stdata = args->stdata;
   field_info	*fi;
   gpointer field_index;
   gpointer orig_key;
   gboolean key_found;
+  gboolean is_wildcard_field = FALSE;
 
-  args = data;
   fi = PITEM_FINFO(node);
 
-  dprintf("fi->hfinfo->abbrev = %s\n", fi->hfinfo->abbrev);
+  char *key = fi->hfinfo->abbrev;  // e.g. char* that has, e.g., "ip.dst" or "frame.number"
+  gulong type = fi->hfinfo->type;     // e.g. int that has, e.g., FT_UINT32 or FT_DOUBLE
 
-  key_found = g_hash_table_lookup_extended(args->stdata->field_indicies,
-                                           fi->hfinfo->abbrev,
+  key_found = g_hash_table_lookup_extended(stdata->field_indicies,
+                                           key,
                                            &orig_key,
                                            &field_index);
-
-  const gchar* val_str;
+  
+  if(!key_found)
+    {
+      // Look to see if the current field name matches any wildcards we have
+      gint i;
+      GPtrArray *wfieldnames = stdata->wfieldnames;
+      for(i = 0; i < wfieldnames->len; i++)
+        {
+          if(g_str_has_prefix(key, g_ptr_array_index(wfieldnames, i)))
+            {
+              // Key found!
+              key_found = TRUE;
+              is_wildcard_field = TRUE;
+              break;
+            }
+        }
+    }
+  
+  gchar* val_str;
   gulong actual_index = (gulong)(field_index);
 
   if(key_found)
     {
-      gulong type = fi->hfinfo->type;
+      GPtrArray *values = NULL;
 
+      dprintf("fi->hfinfo->abbrev = %s\n", fi->hfinfo->abbrev);
+
+      /*
+        XXX needs cleanup
+        NB: wildcard and non-wildcard values and types get stored differently; each non-wildcard
+        value/type get stored in arrays, wildcard value/type entries in hashtables.
+        This is done for efficiency; hashing keys can get expensive - why bother hashing if
+        we know the keys already (in the non-wildcard case)
+        This next if/else block takes care of providing a "common" access mechanism to the
+        values array.  Type access must be done manually.
+      */
+      if(is_wildcard_field)
+        {
+          values = g_hash_table_lookup(stdata->wtree_values, key);
+          if(!values)
+            {
+              values = g_ptr_array_new();
+              g_hash_table_insert(stdata->wtree_values, key, values);
+              
+              // NB: Assume all values have the same type; we set this on the first entry
+              dprintf("ty2pe: %d\n", type);
+
+              // NB: type (a gulong) is being cast as a gpointer here.  This assumes
+              // that gulongs are smaller-than or equal-to the size of gpointers.
+              g_hash_table_insert(stdata->wtree_types, key, type);
+            }
+        }
+      else
+        {
+          values = g_ptr_array_index(stdata->tree_values, actual_index);
+
+          // NB: non-wildcard field type info is handled later in this fn...
+        }
+      
       if(type == FT_STRING)
         {
           dprintf("found a string!\n");
           dprintf("string is: %s\n", (char*)fvalue_get(&(fi->value)));
           dprintf("string as gnfvas: %s\n", get_node_field_value_as_string(fi, args->edt));
 
-          val_str = get_node_field_value_as_string(fi, args->edt); 
-          g_ptr_array_add( g_ptr_array_index(args->stdata->tree_values, actual_index), val_str);
+          val_str = (gchar *)get_node_field_value_as_string(fi, args->edt);
+
+          g_ptr_array_add(values, val_str);
         }
 
       if(type == FT_NONE)
         {
-	  args->stdata->field_types[actual_index] = FT_NONE;
+          gulong tmp_type = FT_NONE;
+
           //check repr
           if(  fi->rep ){
             val_str = g_strdup( fi->rep->representation ); 
-            g_ptr_array_add( g_ptr_array_index(args->stdata->tree_values, actual_index), val_str );
-            args->stdata->field_types[actual_index] = FT_STRING;
+
+            g_ptr_array_add(values, val_str);
+            
+            tmp_type = FT_STRING;
           }
+
+          if(is_wildcard_field)
+            {
+              //XXX CLEANUP
+              //gulong *tmp2 = g_new0(gulong, 1);
+              //*tmp2 = tmp_type;
+              // NB: overwrite the previous value 
+              g_hash_table_insert(stdata->wtree_types, key, tmp_type);
+            }
+          else
+            {
+              stdata->field_types[actual_index] = tmp_type;
+            }
         }
       else if(is_native_type(type) == TRUE)
         {
-          // If we can natively store the type,
-          // do that and don't convert to a string
-	  args->stdata->field_types[actual_index] = type;
-          
           fvalue_t* tmp = g_new(fvalue_t,1);
           memcpy(tmp, &(fi->value), sizeof(fvalue_t));
           
-          g_ptr_array_add( g_ptr_array_index(args->stdata->tree_values, actual_index), tmp );
+          g_ptr_array_add(values, tmp);
+
+          if(is_wildcard_field)
+            {
+              // already taken care of...
+            }
+          else
+            {
+              // If we can natively store the type,
+              // do that and don't convert to a string
+              stdata->field_types[actual_index] = type;
+            }
         }
       else
         {
           // As a last ditch options, convert the value to a string,
           // and don't bother storing the native type
-          val_str = get_node_field_value_as_string(fi, args->edt); 
-          if( strlen(val_str) > 0 ){
-            args->stdata->field_types[actual_index] = FT_STRING;
-          }else{
-            args->stdata->field_types[actual_index] = type;
-          }
+          val_str = (gchar *)get_node_field_value_as_string(fi, args->edt); 
+          if(strlen(val_str) > 0)
+            {
+              if(is_wildcard_field)
+                {
+                  //gulong *tmp = g_new0(gulong, 1);
+                  //*tmp = FT_STRING;
+                  g_hash_table_insert(stdata->wtree_types, key, FT_STRING);
+                }
+              else
+                stdata->field_types[actual_index] = FT_STRING;
+            }
+          else
+            {
+              if(is_wildcard_field)
+                {
+                  gulong *tmp = g_new0(gulong, 1);
+                  *tmp = type;
+                  g_hash_table_insert(stdata->wtree_types, key, tmp);
+                }
+              else
+                stdata->field_types[actual_index] = type;
+            }
           
-          g_ptr_array_add( g_ptr_array_index(args->stdata->tree_values, actual_index), val_str);
+          g_ptr_array_add(values, val_str);
         }
     }
 
@@ -1177,7 +1278,7 @@ glong sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
 
   stdata_add_fields(&stdata, fields, nfields);
 
-  dprintf("stdata.fields->len = %d\n", stdata.fields->len);
+  dprintf("stdata.fieldnames->len = %d\n", stdata.fieldnames->len);
 
   dprintf("stdata.field_types = %lX\n", (glong)stdata.field_types);
   
@@ -1249,20 +1350,17 @@ glong sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
 /* Functions to use for languages that natively support iterators (e.g. Python) */
 
 glong
-sharktools_iter_init(st_data_t *stdata,
-                     gchar *filename, const GPtrArray *fieldnames, gchar *dfilterorig)
+sharktools_iter_init(st_data_t *stdata, gchar *filename, gchar *dfilterorig)
 {
   // create stdata structure
   // open pcap file
   // return stdata
 
-  stdata_init2(stdata, fieldnames->len);
+  stdata_init2(stdata);
 
-  stdata->fields = (GPtrArray *)fieldnames;
+  compute_hashes_from_fieldnames(stdata->field_indicies, stdata->fieldnames);
 
-  compute_hashes_from_fieldnames(stdata->field_indicies, fieldnames);
-
-  dprintf("stdata->fields->len = %d\n", stdata->fields->len);
+  dprintf("stdata->fieldnames->len = %d\n", stdata->fieldnames->len);
 
   dprintf("stdata->field_types = %lX\n", (glong)stdata->field_types);
   
@@ -1333,7 +1431,7 @@ sharktools_iter_next(st_data_t *stdata)
       // (Re)-set all the stdata->field_{values,types} fields
       // FIXME: does this actually need to be done?
       int i;
-      for(i = 0; i < stdata->nfields; i++)
+      for(i = 0; i < stdata->fieldnames->len; i++)
         {
           stdata->field_types[i] = FT_NONE;
         }

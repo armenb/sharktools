@@ -85,10 +85,11 @@ typedef struct
   gulong nfields;
 
   /**
-   * 'fields' holds an ordered list of keys (strings) that are field names
+   * 'fieldnames' holds an ordered list of keys (strings) that are field names
    * of interest, e.g. 'frame.number' or 'ip.len'
    */
-  GPtrArray* fields;
+  GPtrArray* fieldnames;
+  GPtrArray* wfieldnames;
 
   /**
    * 'field_indicies' holds a mappings of hash(key) => integer, where the
@@ -109,6 +110,9 @@ typedef struct
    */
   gulong *field_types; // AB: added to original _output_fields datatype in print.c
 
+
+  GHashTable *wtree_values;
+  GHashTable *wtree_types;
   /* NB: iterator support */
 
   capture_file cfile;
@@ -136,7 +140,7 @@ long sharktools_count(char *filename, char *dfilter);
 long sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
                        gchar *dfilter, sharktools_callbacks *cb);
 
-glong sharktools_iter_init(st_data_t *stdata, gchar *filename, const GPtrArray *fieldnames, gchar *dfilterorig);
+glong sharktools_iter_init(st_data_t *stdata, gchar *filename, gchar *dfilterorig);
 gboolean sharktools_iter_next(st_data_t *stdata);
 gint sharktools_iter_cleanup(st_data_t *stdata);
 

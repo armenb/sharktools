@@ -10,14 +10,16 @@ typedef struct {
   char *decode_as;
   st_data_t *stdata;
   GPtrArray *fieldnames;
-  PyObject *keylist;
+  GPtrArray *wfieldnames;
+  GPtrArray *nwpykeylist;
+  GHashTable *wpykeyhash;
 } pyshark_Iter;
 
 static PyObject *pyshark_iter(PyObject *self, PyObject *args);
 
 PyObject *pyshark_getDict(pyshark_Iter *p);
 //PyObject *pyshark_getValueByIndex(st_data_t *stdata, int i);
-PyObject *pyshark_getValueObjFromTree(gulong type, GPtrArray* tree_values);
+PyObject *pyshark_getTypedValue(gulong type, GPtrArray* tree_values);
 
 
 // Functions to be registered in PyTypeObject struct

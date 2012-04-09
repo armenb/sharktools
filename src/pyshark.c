@@ -195,8 +195,8 @@ pyshark_iter(PyObject *self, PyObject *args)
       PyErr_SetString(PyExc_TypeError, "Second argument must be a list of wireshark fieldnames");
       return NULL;
     }
-  long nfields = PyList_Size(keylistobj);
-  for(i = 0; i < nfields; i++)
+
+  for(i = 0; i < PyList_Size(keylistobj); i++)
     {
       PyObject *fieldnameobj = PyList_GetItem(keylistobj, i);
 
@@ -224,8 +224,8 @@ pyshark_iter(PyObject *self, PyObject *args)
   p->clean = FALSE;
   p->decode_as = NULL;
   p->stdata = NULL;
-  p->fieldnames = NULL;
-  p->keylist = NULL;
+  p->nwpykeylist = NULL;
+  p->wpykeyhash = NULL;
 
   if(!PyObject_Init((PyObject *)p, &pyshark_IterType))
     {
@@ -233,23 +233,66 @@ pyshark_iter(PyObject *self, PyObject *args)
       return NULL;
     }
   
+  p->stdata = g_new0(st_data_t, 1);
+  if(!p->stdata)
+    {
+      Py_DECREF(p);
+      return NULL;
+    }
+  
+  p->wpykeyhash = g_hash_table_new(g_str_hash, g_str_equal);
+
   // NB: Keep a copy of the second argument as a native PyList object (which
   // contains PyStrings)
-  p->keylist = keylistobj;
-  Py_INCREF(p->keylist);
+  //p->nwpykeylist = keylistobj;
+  //Py_INCREF(p->nwpykeylist);
 
   // NB: Convert PyList of PyStrings to array of char *'s for sharktools
-  p->fieldnames = g_ptr_array_new();
-  for(i = 0; i < nfields; i++)
+  p->stdata->fieldnames = g_ptr_array_new();
+  p->stdata->wfieldnames = g_ptr_array_new();
+  p->nwpykeylist = g_ptr_array_new();
+
+  // Iterate through the Python List and add to either fieldnames OR wfieldnames
+  // depending on presence of a '*' in the string
+  for(i = 0; i < PyList_Size(keylistobj); i++)
     {
       // NB: we know these are not NULL because of our sanity checks above
-      PyObject *keyobj = PyList_GetItem(p->keylist, i);
+      PyObject *keyobj = PyList_GetItem(keylistobj, i);
 
-      g_ptr_array_add(p->fieldnames, PyString_AsString(keyobj));
+      /*
+       * Check for wildcard entries, e.g. "*", "ip.*", "eth.*", etc.
+       */
+      const gchar *key = PyString_AsString(keyobj);
+      gchar *ptr = g_strstr_len(key, strnlen(key, 100), "*");
+      if(ptr)
+        {
+          // We have a fieldname with a wildcard in it
+          // Use pointer arithmetic to figure out the length
+          // NB, better way to do this, maybe?
+          gsize prefix_len = (gsize)ptr - (gsize)key;
 
-      // NB: Since the above array_add() call doesn't deep copy the fieldname,
-      // let's increment the refcount, and decrement it when we cleanup
-      Py_INCREF(keyobj);
+          g_ptr_array_add(p->stdata->wfieldnames, g_strndup(key, prefix_len));
+        }
+      else
+        {
+          /*
+           * Non-wildcard entry.
+           */
+          g_ptr_array_add(p->stdata->fieldnames, PyString_AsString(keyobj));
+          
+          /* On the python-module side of things, keep a list of python objects,
+             one for each non-wildcard fieldname to be processed by sharktools.
+             NB: the index between entries in p->{stdata->fieldnames,nwpykeylist}
+             MUST be the same.
+          */
+          g_ptr_array_add(p->nwpykeylist, keyobj);
+
+          /* The above array_add() call doesn't deep copy the fieldname,
+             let's increment the refcount, and decrement it when we cleanup.
+             NB: also used for our copy of the key in p->nwpykeylist
+          */
+          Py_INCREF(keyobj);
+        }
     }
 
   /* If there is a decode_as string set, add it */
@@ -270,9 +313,7 @@ pyshark_iter(PyObject *self, PyObject *args)
   /*
    * Create and initialize sharktools' state
    */
-  p->stdata = g_new0(st_data_t, 1);
-  
-  ret = sharktools_iter_init(p->stdata, filename, p->fieldnames, strdup(dfilter));
+  ret = sharktools_iter_init(p->stdata, filename, strdup(dfilter));
   if(ret < 0)
     {
       dprintf("%s\n", sharktools_errmsg);
@@ -281,7 +322,7 @@ pyshark_iter(PyObject *self, PyObject *args)
       return NULL;
     }
 
-  p->stdata->nfields = nfields;
+  //p->stdata->nfields = nfields;
 
   // NB: We are dirty
   p->clean = FALSE;
@@ -289,8 +330,9 @@ pyshark_iter(PyObject *self, PyObject *args)
   return (PyObject *)p;
 }
 
+#if 0
 PyObject *
-pyshark_getDict(pyshark_Iter *p)
+pyshark_getDictOld(pyshark_Iter *p)
 {
   PyObject *dictobj = PyDict_New();
   int i;
@@ -321,20 +363,142 @@ pyshark_getDict(pyshark_Iter *p)
   
   return dictobj;
 }
+#endif
 
-/*
-PyObject*
-pyshark_getValueByIndex(st_data_t *stdata, int i)
+typedef struct ht_foreach
 {
-  gulong type = stdata->field_types[i];
+  GHashTable *wtree_type_hash;
+  GHashTable *wpykeyhash;
+  PyObject *dictobj;
+} ht_foreach_t;
 
-  GPtrArray* tree_values = stdata->tree_values[i];
-  fvalue_t *val_native = stdata->field_values_native[i];
-  const gchar *val_string = stdata->field_values_str[i];
-*/
+void
+my_ht_foreach_fn(gpointer key, gpointer value, gpointer user_data)
+{
+  /*
+    Unpack
+   */
+  ht_foreach_t *htft = user_data;
+  GHashTable *wtree_type_hash = htft->wtree_type_hash;
+  GHashTable *wpykeyhash = htft->wpykeyhash;
+  PyObject *dictobj = htft->dictobj;
+
+  // Get the PyString object of the key (and make one if it doesn't)
+  PyObject *keyobj = g_hash_table_lookup(wpykeyhash, key);
+  if(!keyobj)
+    {
+      keyobj = Py_BuildValue("s", key);
+      g_hash_table_insert(wpykeyhash, key, keyobj);
+      Py_INCREF(keyobj);
+    }
+  
+  // NB: gpointer is being cast as a gulong; hash table holds
+  // values, NOT pointers to values
+  gulong type = (gulong)g_hash_table_lookup(wtree_type_hash, key);
+  dprintf("type: %d\n", type);
+
+  GPtrArray* wtree_val_arr = value;
+  
+  PyObject *valueobj = pyshark_getTypedValue(type, wtree_val_arr);
+  
+  if(PyDict_SetItem(dictobj, keyobj, valueobj) != 0)
+    {
+      PyErr_SetString(PySharkError, "Adding key/value pair to dictionary failed\n");
+    }
+  
+  /* NB: PyDict_SetItem does not take over ownership,
+     so we explicitly need to disown valueobj.
+  */
+  Py_DECREF(valueobj);
+}
+
+
+PyObject *
+pyshark_getDict(pyshark_Iter *p)
+{
+  PyObject *dictobj = PyDict_New();
+  int i;
+
+  // For each of the keys we are looking to extract values for
+
+  // Get all the non-wildcard entries
+  for(i = 0; i < p->nwpykeylist->len; i++)
+    {
+      PyObject *keyobj = g_ptr_array_index(p->nwpykeylist, i);
+
+      gulong type = p->stdata->field_types[i];
+
+      GPtrArray* tree_values = g_ptr_array_index( p->stdata->tree_values, i);
+
+      PyObject *valueobj = pyshark_getTypedValue(type, tree_values);
+      
+      if(PyDict_SetItem(dictobj, keyobj, valueobj) != 0)
+        {
+          PyErr_SetString(PySharkError, "Adding key/value pair to dictionary failed\n");
+          // XXX memory cleanup
+          return NULL;
+        }
+      
+      /* NB: PyDict_SetItem does not take over ownership,
+         so we explicitly need to disown valueobj.
+      */
+      Py_DECREF(valueobj);
+    }
+
+  /* NB: We use g_hash_table_foreach() instead of GHashTableIter for
+   * backwards compatibility with Glib 2.12, which is the only standard
+   * option present on RHEL5.
+   */
+  ht_foreach_t htft;
+  htft.wtree_type_hash = p->stdata->wtree_types;
+  htft.wpykeyhash = p->wpykeyhash;
+  htft.dictobj = dictobj;
+
+  g_hash_table_foreach(p->stdata->wtree_values, my_ht_foreach_fn, &htft);
+
+#if 0
+  // Get all the wildcard entries
+  GHashTableIter iter;
+  gpointer key, value;
+  g_hash_table_iter_init(&iter, stdata->field_valueshash_table);
+  while(g_hash_table_iter_next (&iter, &key, &value))
+    {
+      // Get the PyString object of the key (and make one if it doesn't)
+      PyString *keyobj = g_hash_table_lookup(p->wpykeyhash, key);
+      if(!keyobj)
+        {
+          keyobj = Py_BuildValue("s", key);
+          g_hash_table_insert(p->wpykeyhash, key, keyobj);
+          Py_INCREF(keyobj);
+        }
+
+      // Now get the type
+      gulong type = g_hash_table_lookup(p->stdata->wtree_type_hash, key);
+
+      // Now get the value
+      GPtrArray* wtree_values = g_hash_table_lookup(p->stdata->wtree_values, key);
+
+      PyObject *valueobj = pyshark_getValueObjFromTree(type, wtree_values);
+
+      if(PyDict_SetItem(dictobj, keyobj, valueobj) != 0)
+        {
+          PyErr_SetString(PySharkError, "Adding key/value pair to dictionary failed\n");
+          // XXX memory cleanup
+          return NULL;
+        }
+      
+      /* NB: PyDict_SetItem does not take over ownership,
+         so we explicitly need to disown valueobj.
+      */
+      Py_DECREF(valueobj);
+    }
+#endif
+
+  return dictobj;
+}
 
 PyObject*
-pyshark_getValueObjFromTree(gulong type, GPtrArray* tree_values)
+pyshark_getTypedValue(gulong type, GPtrArray* tree_values)
 {
   PyObject *valueobj = NULL;
 
@@ -439,7 +603,7 @@ pyshark_Iter_iternext(PyObject *self)
       g_ptr_array_free( p->stdata->tree_values, TRUE);
       p->stdata->tree_values = g_ptr_array_new();
       gsize i;
-      for(i = 0; i < p->stdata->fields->len; i++)
+      for(i = 0; i < p->stdata->fieldnames->len; i++)
         {
           g_ptr_array_add( p->stdata->tree_values, g_ptr_array_new() ); 
         }
@@ -500,12 +664,13 @@ pyshark_iter_cleanup(pyshark_Iter *p)
   if(p->stdata)
     {
       sharktools_iter_cleanup(p->stdata);
+      if(p->stdata->fieldnames)
+        g_ptr_array_free(p->stdata->fieldnames, FALSE);
+      if(p->stdata->wfieldnames)
+        g_ptr_array_free(p->stdata->wfieldnames, FALSE);
       g_free(p->stdata);
       p->stdata = NULL;
     }
-
-  if(p->fieldnames)
-    g_ptr_array_free(p->fieldnames, FALSE);
 
   /* Remove the decode_as string (otherwise, since the setting is global,
      It will persist across calls to this function
@@ -527,18 +692,17 @@ pyshark_iter_cleanup(pyshark_Iter *p)
         }
     }
 
-  if(p->keylist)
+  if(p->nwpykeylist)
     {
-      long nfields = PyList_Size(p->keylist);
-      for(i = 0; i < nfields; i++)
+      for(i = 0; i < p->nwpykeylist->len; i++)
         {
-          PyObject *key = PyList_GetItem(p->keylist, i);
+          PyObject *key = g_ptr_array_index(p->nwpykeylist, i);
           // NB: This DECREF is for the PyString_AsString() calls, where we did NOT
           // copy the strings
           Py_DECREF(key);
         }
-      Py_DECREF(p->keylist);
-      p->keylist = NULL;
+      Py_DECREF(p->nwpykeylist);
+      p->nwpykeylist = NULL;
     }
 
   /* NB: All (pyshark,sharktools}-specific data should
