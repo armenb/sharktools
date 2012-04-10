@@ -82,12 +82,12 @@ class PySharkArgumentChecks(unittest.TestCase):
         for pkt in pkts:
             count += 1
             if("udp.srcport" in pkt and pkt["udp.srcport"] != None):
-                print pkt
+                #print pkt
                 udpcount += 1
         self.failUnless(count == 100)
         self.failUnless(udpcount == 74)
 
-    def tdestPySharkIterator(self):
+    def testPySharkIterator(self):
         pkts = pyshark.iter(self.filename,
                             ['frame.number', 'eth.type'],
                             '')
@@ -95,7 +95,34 @@ class PySharkArgumentChecks(unittest.TestCase):
         for pkt in pkts:
             count += 1
         self.failUnless(count == 100)
+        
+    def testPySharkDisplayFilter(self):
+        """There are 74 UDP packets in the capture"""
+        pkts = pyshark.iter(self.filename,
+                            ['frame.number', 'eth.type'],
+                            'udp')
+        count = 0
+        for pkt in pkts:
+            count += 1
+        #print pkts.next()
+        #print "count =", count
+        self.failUnless(count == 74)
 
+    def testPySharkIteratorWildcard1(self):
+        pkts = pyshark.iter(self.filename,
+                            ['*'],
+                            '')
+        count = 0
+        num_keys = len(pkts.next().keys())
+        self.failUnless(num_keys == 55)
+
+    def testPySharkIteratorWildcard2(self):
+        pkts = pyshark.iter(self.filename,
+                            ['*', 'eth.type'],
+                            '')
+        count = 0
+        num_keys = len(pkts.next().keys())
+        self.failUnless(num_keys == 55)
 
     def tearDown(self):
         pass

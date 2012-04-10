@@ -13,13 +13,16 @@ typedef struct {
   GPtrArray *wfieldnames;
   GPtrArray *nwpykeylist;
   GHashTable *wpykeyhash;
+  gboolean asel; // "Allow Single Element Lists"
+  gboolean ane; // "Allow None Entries"
 } pyshark_Iter;
 
 static PyObject *pyshark_iter(PyObject *self, PyObject *args);
 
 PyObject *pyshark_getDict(pyshark_Iter *p);
 //PyObject *pyshark_getValueByIndex(st_data_t *stdata, int i);
-PyObject *pyshark_getTypedValue(gulong type, GPtrArray* tree_values);
+PyObject *pyshark_getValueWithType(GPtrArray* tree_values, gulong type, gboolean asel);
+static gpointer pyshark_getTypedValue(GPtrArray* tree_values, gchar *format, gboolean allow_single_elem_list);
 
 
 // Functions to be registered in PyTypeObject struct

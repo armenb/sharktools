@@ -116,9 +116,6 @@ typedef struct
   /* NB: iterator support */
 
   capture_file cfile;
-  //gchar *cf_name;
-  //char *dfilter;
-  dfilter_t *rfcode;
 
   gchar        *err_info;
   gint64       data_offset;
@@ -140,7 +137,7 @@ long sharktools_count(char *filename, char *dfilter);
 long sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
                        gchar *dfilter, sharktools_callbacks *cb);
 
-glong sharktools_iter_init(st_data_t *stdata, gchar *filename, gchar *dfilterorig);
+glong sharktools_iter_init(st_data_t *stdata, gchar *filename, const gchar *dfilter);
 gboolean sharktools_iter_next(st_data_t *stdata);
 gint sharktools_iter_cleanup(st_data_t *stdata);
 

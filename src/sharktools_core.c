@@ -668,7 +668,7 @@ static void proto_tree_get_node_field_values(proto_node *node, gpointer data)
               g_hash_table_insert(stdata->wtree_values, key, values);
               
               // NB: Assume all values have the same type; we set this on the first entry
-              dprintf("ty2pe: %d\n", type);
+              // dprintf("ty2pe: %d\n", type);
 
               // NB: type (a gulong) is being cast as a gpointer here.  This assumes
               // that gulongs are smaller-than or equal-to the size of gpointers.
@@ -746,8 +746,6 @@ static void proto_tree_get_node_field_values(proto_node *node, gpointer data)
             {
               if(is_wildcard_field)
                 {
-                  //gulong *tmp = g_new0(gulong, 1);
-                  //*tmp = FT_STRING;
                   g_hash_table_insert(stdata->wtree_types, key, FT_STRING);
                 }
               else
@@ -757,9 +755,7 @@ static void proto_tree_get_node_field_values(proto_node *node, gpointer data)
             {
               if(is_wildcard_field)
                 {
-                  gulong *tmp = g_new0(gulong, 1);
-                  *tmp = type;
-                  g_hash_table_insert(stdata->wtree_types, key, tmp);
+                  g_hash_table_insert(stdata->wtree_types, key, type);
                 }
               else
                 stdata->field_types[actual_index] = type;
@@ -952,10 +948,9 @@ gboolean process_packet(capture_file *cf, gint64 offset, st_data_t *stdata)
   passed = TRUE;
 
   // AB: prime the epan_dissect_t with the dfilter.
-  if(cf->rfcode)
-    {
-      epan_dissect_prime_dfilter(&edt, cf->rfcode);
-    }
+  if(cf->rfcode) {
+    epan_dissect_prime_dfilter(&edt, cf->rfcode);
+  }
 
   tap_queue_init(&edt);
 
@@ -967,23 +962,20 @@ gboolean process_packet(capture_file *cf, gint64 offset, st_data_t *stdata)
   tap_push_tapped_queue(&edt);
   
   // AB: Run the read filter
-  if(cf->rfcode)
-    {
-      passed = dfilter_apply_edt(cf->rfcode, &edt);
-    }
-  else
-    {
-      passed = TRUE;
-    }
+  if(cf->rfcode) {
+    passed = dfilter_apply_edt(cf->rfcode, &edt);
+  }
+  else {
+    passed = TRUE;
+  }
 
-  if(passed)
-    {
-      frame_data_set_after_dissect(&fdata, &cum_bytes, &prev_dis_ts);
-
-      // stdata could be NULL if we are just counting packets
-      if(stdata != NULL)
-        proto_tree_get_fields(stdata, &edt);
-    }
+  if(passed) {
+    frame_data_set_after_dissect(&fdata, &cum_bytes, &prev_dis_ts);
+    
+    /* stdata could be NULL if we are just counting packets */
+    if(stdata != NULL)
+      proto_tree_get_fields(stdata, &edt);
+  }
 
   epan_dissect_cleanup(&edt);
   frame_data_cleanup(&fdata);
@@ -1059,15 +1051,14 @@ GCompareFunc sharktools_gulong_cmp(gconstpointer a, gconstpointer b)
 int sharktools_init(void)
 {
   // NOTE: VERSION is a #define from config.h.  examples: "0.99.7" or "1.0.8"
-  if(strcmp(epan_get_version(), VERSION))
-    {
-      printf("ERROR: sharktools was compiled using version %s of libwireshark.\n", VERSION);
-      printf("However, the libwireshark installed on this system is version %s.\n", epan_get_version());
-      printf("Please recompile sharktools with headers from libwireshark version %s,\n", epan_get_version());
-      printf("or modify LD_LIBRARY_PATH to point to version %s of libwireshark.\n", VERSION);
-      printf("Consult sharktools' README file for more information on using a different version of libwireshark.\n");
-      return -1;
-    }
+  if(strcmp(epan_get_version(), VERSION)) {
+    printf("ERROR: sharktools was compiled using version %s of libwireshark.\n", VERSION);
+    printf("However, the libwireshark installed on this system is version %s.\n", epan_get_version());
+    printf("Please recompile sharktools with headers from libwireshark version %s,\n", epan_get_version());
+    printf("or modify LD_LIBRARY_PATH to point to version %s of libwireshark.\n", VERSION);
+    printf("Consult sharktools' README file for more information on using a different version of libwireshark.\n");
+    return -1;
+  }
 
   // FIXME: Hacky; see note above.
   sharktools_preload_libs();
@@ -1292,7 +1283,7 @@ glong sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
   // Read and process each packet one at a time
   while(wtap_read(cfile.wth, &err, &err_info, &data_offset))
     {
-      dprintf("*******************************\n");
+      //dprintf("*******************************\n");
 
       // (Re)-set all the stdata.field_{values,types} fields
       for(i = 0; i < nfields; i++)
@@ -1313,9 +1304,9 @@ glong sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
               gpointer key;
               key = cb->keys[i];
 
-              dprintf("key = %p\n", key);
+              //dprintf("key = %p\n", key);
 
-	      dprintf("types[%ld] = %ld\n", i, stdata.field_types[i]);
+	      //dprintf("types[%ld] = %ld\n", i, stdata.field_types[i]);
 
               cb->row_set(cb, row, key,
                           stdata.field_types[i],
@@ -1350,11 +1341,11 @@ glong sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
 /* Functions to use for languages that natively support iterators (e.g. Python) */
 
 glong
-sharktools_iter_init(st_data_t *stdata, gchar *filename, gchar *dfilterorig)
+sharktools_iter_init(st_data_t *stdata, gchar *filename, const gchar *dfilter)
 {
-  // create stdata structure
-  // open pcap file
-  // return stdata
+  gchar *cf_name = NULL;
+  dfilter_t *rfcode = NULL;
+  capture_file *cf;
 
   stdata_init2(stdata);
 
@@ -1364,50 +1355,40 @@ sharktools_iter_init(st_data_t *stdata, gchar *filename, gchar *dfilterorig)
 
   dprintf("stdata->field_types = %lX\n", (glong)stdata->field_types);
   
-  gchar *cf_name = NULL;
-  char *dfilter;
-  dfilter_t *rfcode = NULL;
-
-  //stdata->nfields = nfields;
-  stdata->rfcode = NULL;
 
   dprintf("%s: entering...\n", __FUNCTION__);
 
-  dprintf("%s: dfilterorig: %s\n", __FUNCTION__, dfilterorig);
-
-  dfilter = strdup(dfilterorig);
-
   dprintf("%s: dfilter: %s\n", __FUNCTION__, dfilter);
 
-  if(!dfilter_compile(dfilter, &(stdata->rfcode)))
-    {
-      sprintf(errmsg, "%s", dfilter_error_msg);
-      printf("errmsg");
-      if(stdata->rfcode)
-        dfilter_free(stdata->rfcode);
-      return -1;
-    }
+  if(!dfilter_compile(dfilter, &rfcode)) {
+    sprintf(errmsg, "%s", dfilter_error_msg);
+    if(rfcode)
+      dfilter_free(rfcode);
+    return -1;
+  }
 
-  // Defined in cfile.c, looks easy enough to use
-  cap_file_init(&(stdata->cfile));
+  cf = &(stdata->cfile);
+
+  /* Defined in cfile.c, looks easy enough to use */
+  cap_file_init(cf);
 
   cf_name = filename;
 
-  // Open pcap file
+  /* Open pcap file */
   int err;
-  if(cf_open(&(stdata->cfile), cf_name, FALSE, &err) != CF_OK)
-    {
-      //sprintf(errmsg, "%s", dfilter_error_msg);
-      if(rfcode)
-        dfilter_free(rfcode);
-      return -1;
-    }
+  if(cf_open(cf, cf_name, FALSE, &err) != CF_OK) {
+    //sprintf(errmsg, "%s", dfilter_error_msg);
+    if(rfcode)
+      dfilter_free(rfcode);
+    return -1;
+  }
+
+  /* NB: cap_file_init or cf_open zero out cf->rfcode, so
+     change it after those operations
+  */
+  cf->rfcode = rfcode;
 
   dprintf("%s: opened file\n", __FUNCTION__);
-
-  //XXX why are there two??
-  stdata->cfile.rfcode = rfcode;
-  stdata->rfcode = rfcode;
 
   return 0;
 }
@@ -1419,54 +1400,53 @@ sharktools_iter_next(st_data_t *stdata)
   /*
     Continue reading the file to find a matched packet
     or else return something signifying that we're done
-    (i.e. something that translates into StopIteration exception in Python
+    (e.g. something that translates into StopIteration exception in Python
   */
+  capture_file *cf = &(stdata->cfile);
 
   // Read and process each packet one at a time
   int err; // XXX useful??
-  while(wtap_read(stdata->cfile.wth, &err, &(stdata->err_info), &(stdata->data_offset)))
-    {
-      dprintf("*******************************\n");
-
-      // (Re)-set all the stdata->field_{values,types} fields
-      // FIXME: does this actually need to be done?
-      int i;
-      for(i = 0; i < stdata->fieldnames->len; i++)
-        {
-          stdata->field_types[i] = FT_NONE;
-        }
-
-      gboolean passed = FALSE;
-      
-      passed = process_packet(&(stdata->cfile), stdata->data_offset, stdata);
-
-      if(passed)
-	{
-          /*
-            NB: If passed is true, then stdata->field_{types,values_native,values_str}
-            contain a matched packet's data
-            by returning 1, we let our calling environment know there's data
-            for it to read.
-          */
-          return TRUE;
-        }
-
+  while(wtap_read(cf->wth, &err, &(stdata->err_info), &(stdata->data_offset))) {
+    //dprintf("*******************************\n");
+    
+    // (Re)-set all the stdata->field_{values,types} fields
+    // FIXME: does this actually need to be done?
+    int i;
+    for(i = 0; i < stdata->fieldnames->len; i++) {
+      stdata->field_types[i] = FT_NONE;
     }
+    
+    gboolean passed = FALSE;
+    
+    passed = process_packet(cf, stdata->data_offset, stdata);
+    
+    if(passed) {
+      /*
+        NB: If passed is true, then stdata->field_{types,values_native,values_str}
+        contain a matched packet's data
+        by returning 1, we let our calling environment know there's data
+        for it to read.
+      */
+      return TRUE;
+    }
+    
+  }
 
-  return FALSE; // something signifying a StopIteration exception
+  /* Something signifying a that the iteration is done */
+  return FALSE;
 }
 
 gint
 sharktools_iter_cleanup(st_data_t *stdata)
 {
-  if(stdata->rfcode)
-    dfilter_free(stdata->rfcode);
-  if(stdata->cfile.wth)
-    {
-      wtap_close(stdata->cfile.wth);
-      stdata->cfile.wth = NULL;
-    }
-
+  capture_file *cf = &(stdata->cfile);
+  if(cf->rfcode)
+    dfilter_free(cf->rfcode);
+  if(cf->wth) {
+    wtap_close(cf->wth);
+    cf->wth = NULL;
+  }
+  
   stdata_cleanup2(stdata);
 
   dprintf("%s: ...leaving.\n", __FUNCTION__);
