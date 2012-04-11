@@ -125,6 +125,9 @@ typedef struct
 
 char sharktools_errmsg[2048];
 
+st_data_t* stdata_new();
+void stdata_free(st_data_t *stdata);
+
 int sharktools_preload_libs(void);
 void sharktools_register_native_types(GTree *native_types);
 GCompareFunc sharktools_gulong_cmp(gconstpointer a, gconstpointer b);

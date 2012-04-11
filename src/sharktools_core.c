@@ -326,7 +326,8 @@ write_failure_message(const char *filename, int err)
 }
 #endif //(WIRESHARK_1_2_0 || WIRESHARK_1_4_0)
 
-static void stdata_init(st_data_t* stdata, gulong nfields)
+static void
+stdata_init_old(st_data_t* stdata, gulong nfields)
 {
   gsize i;
 
@@ -362,7 +363,31 @@ static void stdata_init(st_data_t* stdata, gulong nfields)
 
 }
 
-static void stdata_init2(st_data_t* stdata)
+st_data_t*
+stdata_new()
+{
+  st_data_t *stdata;
+
+  stdata = g_new0(st_data_t, 1);
+
+  stdata->fieldnames = g_ptr_array_new();
+  stdata->wfieldnames = g_ptr_array_new();
+
+  return stdata;
+}
+
+void
+stdata_free(st_data_t *stdata)
+{
+  if(stdata->fieldnames)
+    g_ptr_array_free(stdata->fieldnames, FALSE);
+  if(stdata->wfieldnames)
+    g_ptr_array_free(stdata->wfieldnames, FALSE);
+  g_free(stdata);
+}
+
+static void
+stdata_init(st_data_t* stdata)
 {
   gsize i;
 
@@ -393,7 +418,8 @@ static void stdata_init2(st_data_t* stdata)
  * Here we cleanup stdata by deallocating it's members in reverse order of 
  * allocation.
  */
-static void stdata_cleanup(st_data_t* stdata)
+static void
+stdata_cleanup_old(st_data_t* stdata)
 {
   gsize i;
 
@@ -431,7 +457,8 @@ static void stdata_cleanup(st_data_t* stdata)
  * Here we cleanup stdata by deallocating it's members in reverse order of 
  * allocation.
  */
-static void stdata_cleanup2(st_data_t* stdata)
+static void
+stdata_cleanup(st_data_t* stdata)
 {
   gsize i;
 
@@ -1265,7 +1292,7 @@ glong sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
 
   dprintf("nfields = %ld\n", nfields);
 
-  stdata_init(&stdata, nfields);
+  stdata_init_old(&stdata, fields);
 
   stdata_add_fields(&stdata, fields, nfields);
 
@@ -1347,7 +1374,9 @@ sharktools_iter_init(st_data_t *stdata, gchar *filename, const gchar *dfilter)
   dfilter_t *rfcode = NULL;
   capture_file *cf;
 
-  stdata_init2(stdata);
+  dprintf("%s: entering...\n", __FUNCTION__);
+
+  stdata_init(stdata);
 
   compute_hashes_from_fieldnames(stdata->field_indicies, stdata->fieldnames);
 
@@ -1355,9 +1384,6 @@ sharktools_iter_init(st_data_t *stdata, gchar *filename, const gchar *dfilter)
 
   dprintf("stdata->field_types = %lX\n", (glong)stdata->field_types);
   
-
-  dprintf("%s: entering...\n", __FUNCTION__);
-
   dprintf("%s: dfilter: %s\n", __FUNCTION__, dfilter);
 
   if(!dfilter_compile(dfilter, &rfcode)) {
@@ -1447,7 +1473,7 @@ sharktools_iter_cleanup(st_data_t *stdata)
     cf->wth = NULL;
   }
   
-  stdata_cleanup2(stdata);
+  stdata_cleanup(stdata);
 
   dprintf("%s: ...leaving.\n", __FUNCTION__);
 

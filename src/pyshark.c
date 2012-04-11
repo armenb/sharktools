@@ -224,7 +224,7 @@ pyshark_iter(PyObject *self, PyObject *args)
     return NULL;
   }
   
-  p->stdata = g_new0(st_data_t, 1);
+  p->stdata = stdata_new();
   if(!p->stdata) {
     Py_DECREF(p);
     return NULL;
@@ -232,8 +232,6 @@ pyshark_iter(PyObject *self, PyObject *args)
   
   p->wpykeyhash = g_hash_table_new(g_str_hash, g_str_equal);
 
-  p->stdata->fieldnames = g_ptr_array_new();
-  p->stdata->wfieldnames = g_ptr_array_new();
   p->nwpykeylist = g_ptr_array_new();
 
   /*
@@ -583,11 +581,7 @@ pyshark_iter_cleanup(pyshark_Iter *p)
 
   if(p->stdata) {
     sharktools_iter_cleanup(p->stdata);
-    if(p->stdata->fieldnames)
-      g_ptr_array_free(p->stdata->fieldnames, FALSE);
-    if(p->stdata->wfieldnames)
-      g_ptr_array_free(p->stdata->wfieldnames, FALSE);
-    g_free(p->stdata);
+    stdata_free(p->stdata);
     p->stdata = NULL;
   }
 
