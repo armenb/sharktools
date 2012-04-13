@@ -110,7 +110,7 @@ static PyTypeObject pyshark_IterType = {
 static PyObject *PySharkError;
 
 static gpointer
-format_field(gpointer item, gchar *format)
+pyshark_format_field(gpointer item, gchar *format)
 {
   if(strcmp(format,"s") == 0) {
     return Py_BuildValue(format, item);
@@ -153,14 +153,14 @@ static gpointer
 pyshark_getTypedValue(GPtrArray* tree_values, gchar *format, gboolean allow_single_elem_list)
 {
   if(!allow_single_elem_list && tree_values->len == 1) {
-    return format_field(g_ptr_array_index(tree_values, 0), format);
+    return pyshark_format_field(g_ptr_array_index(tree_values, 0), format);
   }
   else {
     gint i;
     PyObject *valueobj = PyList_New((long)0);
 
     for(i = 0; i < tree_values->len; ++i) {
-      PyList_Append(valueobj, format_field(g_ptr_array_index(tree_values, i), format));
+      PyList_Append(valueobj, pyshark_format_field(g_ptr_array_index(tree_values, i), format));
     }
     
     return valueobj;
@@ -369,8 +369,10 @@ pyshark_getDict(pyshark_Iter *p)
   for(i = 0; i < p->nwpykeylist->len; i++) {
     PyObject *keyobj = g_ptr_array_index(p->nwpykeylist, i);
     
-    gulong type = p->stdata->field_types[i];
-    
+    gulong type;
+    type = p->stdata->field_types[i];
+    type = g_array_index(p->stdata->tree_types, gulong, i);
+
     GPtrArray* tree_values = g_ptr_array_index(p->stdata->tree_values, i);
     
     PyObject *valueobj = pyshark_getValueWithType(tree_values, type, p->asel);

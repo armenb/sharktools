@@ -22,7 +22,28 @@ class PySharkArgumentChecks(unittest.TestCase):
     def setUp(self):
         self.filename = "capture1.pcap"
 
-    def testPySharkBadFilename(self):
+    def testPySharkFilenameDoesntExist1(self):
+        """This should fail because the file doesn't exist"""
+        try:
+            pkts = pyshark.iter("thisfiledoesntexist.pcap",
+                                ['frame.number', 'eth.type'],
+                                '')
+            self.fail("Bad Filename did not raise PySharkError")
+        except PySharkError:
+            pass
+
+    def testPySharkFilenameDoesntExist3(self):
+        """This should fail because the filename is an empty string"""
+        try:
+            pkts = pyshark.iter("",
+                                ['frame.number', 'eth.type'],
+                                '')
+            self.fail("Bad Filename did not raise PySharkError")
+        except PySharkError:
+            pass
+
+    def testPySharkBadFilename1(self):
+        """This should fail because the first argument is a number"""
         try:
             pkts = pyshark.iter(34,
                                 ['frame.number', 'eth.type'],
@@ -31,6 +52,16 @@ class PySharkArgumentChecks(unittest.TestCase):
         except TypeError:
             pass
             
+    def testPySharkBadFilename2(self):
+        """This should fail because the filename is None"""
+        try:
+            pkts = pyshark.iter(None,
+                                ['frame.number', 'eth.type'],
+                                '')
+            self.fail("Bad Filename did not raise TypeError")
+        except TypeError:
+            pass
+
     def testPySharkBadFieldNames1(self):
         """This should fail because the second argument is not a list"""
         try:
@@ -61,7 +92,7 @@ class PySharkArgumentChecks(unittest.TestCase):
         except TypeError:
             pass
 
-    def testPySharkBadDecodeAs(self):
+    def testPySharkBadDecodeAs1(self):
         try:
             pkts = pyshark.iter(self.filename,
                                 ['frame.number', 'eth.type'],
@@ -70,6 +101,40 @@ class PySharkArgumentChecks(unittest.TestCase):
             self.fail("Bad Decode As string did not raise TypeError")
         except PySharkError:
             pass
+
+    def testPySharkBadDecodeAs2(self):
+        try:
+            pkts = pyshark.iter(self.filename,
+                                ['frame.number', 'eth.type'],
+                                '',
+                                '')
+            self.fail("Bad Decode As string did not raise TypeError")
+        except PySharkError:
+            pass
+
+    def testPySharkBadDecodeAs3(self):
+        try:
+            pkts = pyshark.iter(self.filename,
+                                ['frame.number', 'eth.type'],
+                                '',
+                                None)
+            self.fail("Bad Decode As string did not raise TypeError")
+        except PySharkError:
+            pass
+
+    def testPySharkBadDecodeAs3(self):
+        pkts = pyshark.iter(self.filename,
+                            ['frame.number', 'eth.type'],
+                            '',
+                            'tcp.port==80,ftp')
+        del pkts
+        
+    def tearDown(self):
+        pass
+
+class PySharkParsingChecks(unittest.TestCase):
+    def setUp(self):
+        self.filename = "capture1.pcap"
 
     def testPySharkIterator(self):
         """capture1.pcap has 100 packets in it; 74 are udp packets
@@ -81,13 +146,13 @@ class PySharkArgumentChecks(unittest.TestCase):
         udpcount = 0 
         for pkt in pkts:
             count += 1
-            if("udp.srcport" in pkt and pkt["udp.srcport"] != None):
+            if("udp.srcport" in pkt and pkt["udp.srcport"] not in [None, []]):
                 #print pkt
                 udpcount += 1
         self.failUnless(count == 100)
         self.failUnless(udpcount == 74)
 
-    def testPySharkIterator(self):
+    def testPySharkIterator2(self):
         pkts = pyshark.iter(self.filename,
                             ['frame.number', 'eth.type'],
                             '')
@@ -123,6 +188,14 @@ class PySharkArgumentChecks(unittest.TestCase):
         count = 0
         num_keys = len(pkts.next().keys())
         self.failUnless(num_keys == 55)
+
+    def testPySharkIteratorWildcard3(self):
+        pkts = pyshark.iter(self.filename,
+                            ['ip.*', 'eth.type'],
+                            '')
+        count = 0
+        num_keys = len(pkts.next().keys())
+        self.failUnless(num_keys == 25)
 
     def tearDown(self):
         pass

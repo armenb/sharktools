@@ -61,15 +61,20 @@ extern char sharktools_errmsg[2048];
 #endif
 
 
-void *cb_row_new(sharktools_callbacks *cb)
+gpointer cb_row_new(sharktools_callbacks *cb)
 {
   return NULL;
 }
 
-void *cb_row_set(sharktools_callbacks *cb, void *row, void *key, gulong type, fvalue_t *val_native, const gchar *val_string)
+gpointer cb_row_set(sharktools_callbacks *cb, void *row, void *key, gulong type, GPtrArray *tree_values)
 {
   static nstime_t *tmp_timestamp;
   double tmp_double;
+
+  // Bomb out; I haven't updated this app...
+  fvalue_t *val_native;
+  const gchar *val_string;
+  g_assert_not_reached();
 
   //printf("%s (%d)\t\t", val_string, (int)type);
   switch(type)
@@ -139,7 +144,7 @@ void *cb_row_set(sharktools_callbacks *cb, void *row, void *key, gulong type, fv
   return NULL;
 }
 
-void *cb_row_add(sharktools_callbacks *cb, gpointer row)
+gpointer cb_row_add(sharktools_callbacks *cb, gpointer row)
 {
   printf("\n");
   return NULL;
@@ -188,6 +193,9 @@ int main(int argc, char **argv)
 {
 #if DEBUG==0
   GLogLevelFlags       log_flags;
+
+  // Bomb out
+  g_assert_not_reached();
 
   /* nothing more than the standard GLib handler, but without a warning */
   log_flags =
