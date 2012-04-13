@@ -74,6 +74,20 @@ extern char sharktools_errmsg[2048];
 #define dprintf(args...) ((void)0)
 #endif
 
+static PyMethodDef pyshark_Iter_methods[] = {
+    {"setAllowSingleElementLists",
+     (PyCFunction)pysharkIter_setAllowSingleElementLists,
+     METH_NOARGS,
+     "yay setAllowSingleElementLists\n"
+     "hmm."},
+    /*
+    {"data", (PyCFunction)Sequence_data, METH_NOARGS,
+     "sequence.data() -> iterator object\n"
+     "Returns iterator of range [0, sequence.max)."},
+    */
+    {NULL} /* Sentinel */
+};
+
 static PyTypeObject pyshark_IterType = {
     PyObject_HEAD_INIT(NULL)
     0,                         /*ob_size*/
@@ -99,15 +113,41 @@ static PyTypeObject pyshark_IterType = {
       /* tp_flags: Py_TPFLAGS_HAVE_ITER tells python to
          use tp_iter and tp_iternext fields. */
     "Internal iter iterator object.",           /* tp_doc */
-    0,  /* tp_traverse */
-    0,  /* tp_clear */
-    0,  /* tp_richcompare */
-    0,  /* tp_weaklistoffset */
-    pyshark_Iter_iter,  /* tp_iter: __iter__() method */
-    pyshark_Iter_iternext  /* tp_iternext: next() method */
+    0,                         /* tp_traverse */
+    0,                         /* tp_clear */
+    0,                         /* tp_richcompare */
+    0,                         /* tp_weaklistoffset */
+    pyshark_Iter_iter,         /* tp_iter: __iter__() method */
+    pyshark_Iter_iternext,     /* tp_iternext: next() method */
+    pyshark_Iter_methods,      /* tp_methods */
+    0,                         /* tp_members */
+    0,                         /* tp_getset */
+    0,                         /* tp_base */
+    0,                         /* tp_dict */
+    0,                         /* tp_descr_get */
+    0,                         /* tp_descr_set */
+    0,                         /* tp_dictoffset */
+    (initproc)Sequence_init,   /* tp_init */
+    0,                         /* tp_alloc */
+    PyType_GenericNew,         /* tp_new */
 };
 
 static PyObject *PySharkError;
+
+static PyObject *Sequence_data(SequenceObject *self, PyObject *args)
+{
+    size_t *info = malloc(sizeof(size_t));
+    if (info == NULL) return NULL;
+    *info = 0;
+
+    /* |info| will be free'()d by the returned generator object. */
+    GeneratorObject *ret = Generator_New(self, info, true,
+                                         &Sequence_data_next_callback);
+    if (ret == NULL) {
+        free(info); /* Watch out for memory leaks! */
+    }
+    return ret;
+}
 
 static gpointer
 pyshark_format_field(gpointer item, gchar *format)
@@ -626,6 +666,7 @@ pyshark_iter_cleanup(pyshark_Iter *p)
 
 static PyMethodDef PySharkMethods[] = {
   {"read",  pyshark_iter, METH_VARARGS, "Return a pyshark iterator"},
+  {"iter",  pyshark_iter, METH_VARARGS, "Return a pyshark iterator"},
   {"iter",  pyshark_iter, METH_VARARGS, "Return a pyshark iterator"},
 
   {NULL, NULL, 0, NULL}        /* Sentinel */
