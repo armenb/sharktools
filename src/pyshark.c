@@ -74,20 +74,97 @@ extern char sharktools_errmsg[2048];
 #define dprintf(args...) ((void)0)
 #endif
 
+//static PyObject *pysharkIter_allowSingleElementLists(PyObject *self, PyObject *args);
+//static PyObject *pysharkIter_allowNoneElements(PyObject *self, PyObject *args);
+
+static PyObject *pysharkIter_allowSingleElementLists(PyObject *self, PyObject *args)
+{
+  pyshark_Iter *p = (pyshark_Iter *)self;
+  PyObject *boolarg = NULL;
+
+  if(!PyArg_ParseTuple(args, "|O", &boolarg)) {
+    return NULL;
+   }
+
+  /* If true, act as a setter.  else, act as a getter */
+  if(boolarg) {
+    if(!PyBool_Check(boolarg)) {
+      PyErr_SetString(PyExc_TypeError, "Optional boolean argument expected");
+      return NULL;
+    }
+    if(boolarg == Py_True) {
+      p->asel = TRUE;
+    }
+    else {
+      p->asel = FALSE;
+    }
+    return Py_None;
+  }
+  else {
+    if(p->asel == TRUE) {
+      Py_INCREF(Py_True);
+      return Py_True;
+    }
+    else {
+      Py_INCREF(Py_False);
+      return Py_False;
+    }        
+  }
+}
+
+static PyObject *pysharkIter_allowNoneElements(PyObject *self, PyObject *args)
+{
+  pyshark_Iter *p = (pyshark_Iter *)self;
+  PyObject *boolarg = NULL;
+
+  if(!PyArg_ParseTuple(args, "|O", &boolarg)) {
+    return NULL;
+   }
+
+  /* If true, act as a setter.  else, act as a getter */
+  if(boolarg) {
+    if(!PyBool_Check(boolarg)) {
+      PyErr_SetString(PyExc_TypeError, "Optional boolean argument expected");
+      return NULL;
+    }
+    if(boolarg == Py_True) {
+      p->ane = TRUE;
+    }
+    else {
+      p->ane = FALSE;
+    }
+    return Py_None;
+  }
+  else {
+    if(p->ane == TRUE) {
+      Py_INCREF(Py_True);
+      return Py_True;
+    }
+    else {
+      Py_INCREF(Py_False);
+      return Py_False;
+    }        
+  }
+}
+
 static PyMethodDef pyshark_Iter_methods[] = {
-    {"setAllowSingleElementLists",
-     (PyCFunction)pysharkIter_setAllowSingleElementLists,
-     METH_NOARGS,
-     "yay setAllowSingleElementLists\n"
-     "hmm."},
-    /*
-    {"data", (PyCFunction)Sequence_data, METH_NOARGS,
-     "sequence.data() -> iterator object\n"
-     "Returns iterator of range [0, sequence.max)."},
-    */
-    {NULL} /* Sentinel */
+    {"allowSingleElementLists",
+     (PyCFunction)pysharkIter_allowSingleElementLists,
+     METH_VARARGS,
+     "yay allowSingleElementLists\n",
+     },
+    {"allowNoneElements",
+     (PyCFunction)pysharkIter_allowNoneElements,
+     METH_VARARGS,
+     "yay allowNoneElements\n",
+     },
+    {NULL, NULL, 0, NULL} /* Sentinel */
 };
 
+/*
+  NB: See $PYTHON/Include/object.h or http://docs.python.org/c-api/typeobj.html
+  for details on this data structure
+*/
 static PyTypeObject pyshark_IterType = {
     PyObject_HEAD_INIT(NULL)
     0,                         /*ob_size*/
@@ -109,7 +186,7 @@ static PyTypeObject pyshark_IterType = {
     0,                         /*tp_getattro*/
     0,                         /*tp_setattro*/
     0,                         /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER,
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER | Py_TPFLAGS_HAVE_CLASS,
       /* tp_flags: Py_TPFLAGS_HAVE_ITER tells python to
          use tp_iter and tp_iternext fields. */
     "Internal iter iterator object.",           /* tp_doc */
@@ -127,27 +204,19 @@ static PyTypeObject pyshark_IterType = {
     0,                         /* tp_descr_get */
     0,                         /* tp_descr_set */
     0,                         /* tp_dictoffset */
-    (initproc)Sequence_init,   /* tp_init */
+    0,   /* tp_init */
     0,                         /* tp_alloc */
-    PyType_GenericNew,         /* tp_new */
+    0, /*PyType_GenericNew, */        /* tp_new */
+    0, /* tp_free */
+    0, /* tp_is_gc */
+    0, /* tp_bases */
+    0, /* tp_mro */
+    0, /* tp_cache */
+    0, /* tp_subclasses */
+    0, /* tp_weaklist */
 };
 
 static PyObject *PySharkError;
-
-static PyObject *Sequence_data(SequenceObject *self, PyObject *args)
-{
-    size_t *info = malloc(sizeof(size_t));
-    if (info == NULL) return NULL;
-    *info = 0;
-
-    /* |info| will be free'()d by the returned generator object. */
-    GeneratorObject *ret = Generator_New(self, info, true,
-                                         &Sequence_data_next_callback);
-    if (ret == NULL) {
-        free(info); /* Watch out for memory leaks! */
-    }
-    return ret;
-}
 
 static gpointer
 pyshark_format_field(gpointer item, gchar *format)
@@ -240,12 +309,28 @@ pyshark_iter(PyObject *self, PyObject *args)
   }
 
   /*
+    NB: See PyObject.ob_type in http://docs.python.org/c-api/typeobj.html
+    for more info    
+   */
+  pyshark_IterType.ob_type = &PyType_Type; //pyshark_Iter;
+
+  /*
+    NB: look at bottom of http://docs.python.org/c-api/type.html
+   */
+  ret = PyType_Ready(&pyshark_IterType);
+  if(ret) {
+    return NULL;
+  }
+
+
+  /*
     Create our iterator object
   */
   p = PyObject_New(pyshark_Iter, &pyshark_IterType);
   if(!p) {
     return NULL;
   }
+
 
   /*
     Initialize all our data structures in the iterator object to 0. This makes it easier
@@ -368,6 +453,7 @@ my_ht_foreach_fn(gpointer key, gpointer value, gpointer user_data)
   GHashTable *wpykeyhash = htft->wpykeyhash;
   PyObject *dictobj = htft->dictobj;
   gboolean asel = htft->asel;
+  gboolean ane = htft->ane;
 
   /* Get the PyString object of the key (and make one if it doesn't) */
   PyObject *keyobj = g_hash_table_lookup(wpykeyhash, key);
@@ -383,7 +469,15 @@ my_ht_foreach_fn(gpointer key, gpointer value, gpointer user_data)
      values, NOT pointers to values
   */
   gulong type = (gulong)g_hash_table_lookup(wtree_type_hash, key);
-  //dprintf("type: %d\n", type);
+  //printf("name: %s; type: %d\n", key, type);
+
+  if(!ane && type == FT_NONE) {
+    /*
+      The object has type FT_NONE, and we've been instructed to not
+      include "None" elements
+     */
+    return;
+  }
 
   PyObject *valueobj = pyshark_getValueWithType(wtree_values, type, asel);
   
@@ -412,6 +506,16 @@ pyshark_getDict(pyshark_Iter *p)
     gulong type;
     type = p->stdata->field_types[i];
     type = g_array_index(p->stdata->tree_types, gulong, i);
+
+    //printf("name: %s; type: %d\n", key, type);
+
+    if(!p->ane && type == FT_NONE) {
+      /*
+        The object has type FT_NONE, and we've been instructed to not
+        include "None" elements
+      */
+      continue;
+    }
 
     GPtrArray* tree_values = g_ptr_array_index(p->stdata->tree_values, i);
     
@@ -667,7 +771,7 @@ pyshark_iter_cleanup(pyshark_Iter *p)
 static PyMethodDef PySharkMethods[] = {
   {"read",  pyshark_iter, METH_VARARGS, "Return a pyshark iterator"},
   {"iter",  pyshark_iter, METH_VARARGS, "Return a pyshark iterator"},
-  {"iter",  pyshark_iter, METH_VARARGS, "Return a pyshark iterator"},
+  //{"iter",  pyshark_iter, METH_VARARGS, "Return a pyshark iterator"},
 
   {NULL, NULL, 0, NULL}        /* Sentinel */
 };

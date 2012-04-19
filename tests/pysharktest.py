@@ -169,8 +169,6 @@ class PySharkParsingChecks(unittest.TestCase):
         count = 0
         for pkt in pkts:
             count += 1
-        #print pkts.next()
-        #print "count =", count
         self.failUnless(count == 74)
 
     def testPySharkIteratorWildcard1(self):
@@ -199,6 +197,40 @@ class PySharkParsingChecks(unittest.TestCase):
 
     def tearDown(self):
         pass
+
+
+class PySharkCrazy(unittest.TestCase):
+    def setUp(self):
+        self.filename = "capture1.pcap"
+
+    def testPySharkCrazyStuff(self):
+        """Crazy"""
+        pkts = pyshark.iter(self.filename,
+                            ['frame.number', 'eth.type', 'udp.srcport', 'tcp.srcport'],
+                            'udp')
+        print dir(pkts)
+        print pkts.allowSingleElementLists.__doc__
+        print "default = %s" % pkts.allowSingleElementLists()
+        print "changing...%s" % pkts.allowSingleElementLists(False)
+        print "changed = %s" % pkts.allowSingleElementLists()
+        print "default = %s" % pkts.allowNoneElements()
+        print "changing...%s" % pkts.allowNoneElements(False)
+        print "changed = %s" % pkts.allowNoneElements()
+        count = 0
+        print pkts.next()
+        print pkts.next()
+        print pkts.next()
+        print pkts.next()
+        #for pkt in pkts:
+        #    print "count = %d" % count
+        #    count += 1
+        #print pkts.next()
+        #print "count =", count
+        #self.failUnless(count == 74)
+
+    def tearDown(self):
+        pass
+
 
 def suite():
     suite = unittest.makeSuite()
