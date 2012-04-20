@@ -407,7 +407,7 @@ stdata_init(st_data_t* stdata)
       g_ptr_array_add( stdata->tree_values, g_ptr_array_new() );
     }
   stdata->field_types = g_new(gulong, nfields);
-  stdata->tree_types = g_array_sized_new(FALSE, TRUE, sizeof(gulong), nfields);
+  ////stdata->tree_types = g_array_sized_new(FALSE, TRUE, sizeof(gulong), nfields);
 
   stdata->wtree_types = g_hash_table_new(g_str_hash, g_str_equal);
   stdata->wtree_values = g_hash_table_new(g_str_hash, g_str_equal);
@@ -425,7 +425,7 @@ stdata_cleanup_old(st_data_t* stdata)
 
   g_assert(stdata);
   
-  g_array_free(stdata->tree_types, FALSE);
+  ////g_array_free(stdata->tree_types, FALSE);
 
   g_free(stdata->field_types);
 
@@ -466,8 +466,8 @@ stdata_cleanup(st_data_t* stdata)
 
   g_assert(stdata);
   
-  if(stdata->tree_types)
-    g_array_free(stdata->tree_types, FALSE);
+  ////if(stdata->tree_types)
+    ////g_array_free(stdata->tree_types, FALSE);
 
   if(stdata->field_types)
     g_free(stdata->field_types);
@@ -751,7 +751,7 @@ static void proto_tree_get_node_field_values(proto_node *node, gpointer data)
           else
             {
               stdata->field_types[actual_index] = tmp_type;
-              g_array_insert_val(stdata->tree_types, actual_index, tmp_type);
+              ////g_array_insert_val(stdata->tree_types, actual_index, tmp_type);
             }
         }
       else if(is_native_type(type) == TRUE)
@@ -770,7 +770,7 @@ static void proto_tree_get_node_field_values(proto_node *node, gpointer data)
               // If we can natively store the type,
               // do that and don't convert to a string
               stdata->field_types[actual_index] = type;
-              g_array_insert_val(stdata->tree_types, actual_index, type);
+              ////g_array_insert_val(stdata->tree_types, actual_index, type);
             }
         }
       else
@@ -788,7 +788,7 @@ static void proto_tree_get_node_field_values(proto_node *node, gpointer data)
                 {
                   gulong tmp_type = FT_STRING;
                   stdata->field_types[actual_index] = tmp_type;
-                  g_array_insert_val(stdata->tree_types, actual_index, tmp_type);
+                  ////g_array_insert_val(stdata->tree_types, actual_index, tmp_type);
                 }
             }
           else
@@ -800,7 +800,7 @@ static void proto_tree_get_node_field_values(proto_node *node, gpointer data)
               else
                 {
                   stdata->field_types[actual_index] = type;
-                  g_array_insert_val(stdata->tree_types, actual_index, type);
+                  ////g_array_insert_val(stdata->tree_types, actual_index, type);
                 }
             }
           g_ptr_array_add(values, val_str);

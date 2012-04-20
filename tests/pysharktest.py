@@ -199,24 +199,157 @@ class PySharkParsingChecks(unittest.TestCase):
         pass
 
 
-class PySharkCrazy(unittest.TestCase):
+class PySharkToggle(unittest.TestCase):
+    """This suite looks at the first 6 packets of capture1.pcap and toggles
+all four combinations of True/False for the showEmptyFields() and
+allowSingleElementLists() and compares iterator output to a reference output.
+
+NB: of the 6 packets, first 2 packets are UDP, then 3 ARP packets, then 1 UDP
+"""
     def setUp(self):
         self.filename = "capture1.pcap"
 
-    def testPySharkCrazyStuff(self):
+    def testAselFieldMethodToggling(self):
+        """Make sure toggling works"""
+
+        pkts = pyshark.iter(self.filename,
+                            ['tcp.dstport', 'frame.number', 'arp.hw.type', 'udp.srcport', 'tcp.srcport'],
+                            '')
+
+        pkts.allowSingleElementLists(False)
+        self.failUnless(pkts.allowSingleElementLists() == False)
+        pkts.allowSingleElementLists(True)
+        self.failUnless(pkts.allowSingleElementLists() == True)
+        pkts.allowSingleElementLists(False)
+        self.failUnless(pkts.allowSingleElementLists() == False)
+
+        pkts.showEmptyFields(False)
+        self.failUnless(pkts.showEmptyFields() == False)
+        pkts.showEmptyFields(True)
+        self.failUnless(pkts.showEmptyFields() == True)
+        pkts.showEmptyFields(False)
+        self.failUnless(pkts.showEmptyFields() == False)
+        
+    def testAselTrueFieldsTrue(self):
+        """allowSingleElementLists(True) and showEmptyFields(True)"""
+        pkts = pyshark.iter(self.filename,
+                            ['tcp.dstport', 'frame.number', 'arp.hw.type', 'udp.srcport', 'tcp.srcport'],
+                            '')
+
+        pkts.allowSingleElementLists(True)
+        pkts.showEmptyFields(True)
+
+        pktlistref = [
+            {'frame.number': [1], 'tcp.srcport': [], 'tcp.dstport': [], 'arp.hw.type': [], 'udp.srcport': [60000]},
+            {'frame.number': [2], 'tcp.srcport': [], 'tcp.dstport': [], 'arp.hw.type': [], 'udp.srcport': [60000]},
+            {'frame.number': [3], 'tcp.srcport': [], 'tcp.dstport': [], 'arp.hw.type': [1], 'udp.srcport': []},
+            {'frame.number': [4], 'tcp.srcport': [], 'tcp.dstport': [], 'arp.hw.type': [1], 'udp.srcport': []},
+            {'frame.number': [5], 'tcp.srcport': [], 'tcp.dstport': [], 'arp.hw.type': [1], 'udp.srcport': []},
+            {'frame.number': [6], 'tcp.srcport': [], 'tcp.dstport': [], 'arp.hw.type': [], 'udp.srcport': [60000]}]
+        
+        pktlist = []
+        for i in range(1, 7):
+            pkt = pkts.next()
+            pktlist.append(pkt)
+
+        #print pktlist
+        self.failUnless(pktlist == pktlistref)
+
+    def testAselTrueFieldsFalse(self):
+        """allowSingleElementLists(True) and showEmptyFields(False)"""
+        pkts = pyshark.iter(self.filename,
+                            ['tcp.dstport', 'frame.number', 'arp.hw.type', 'udp.srcport', 'tcp.srcport'],
+                            '')
+
+        pkts.allowSingleElementLists(True)
+        pkts.showEmptyFields(False)
+
+        pktlistref = [
+            {'frame.number': [1], 'udp.srcport': [60000]},
+            {'frame.number': [2], 'udp.srcport': [60000]},
+            {'frame.number': [3], 'arp.hw.type': [1]},
+            {'frame.number': [4], 'arp.hw.type': [1]},
+            {'frame.number': [5], 'arp.hw.type': [1]},
+            {'frame.number': [6], 'udp.srcport': [60000]}]
+        
+        pktlist = []
+
+        for i in range(1, 7):
+            pkt = pkts.next()
+            pktlist.append(pkt)
+
+        #print pktlist
+        self.failUnless(pktlist == pktlistref)
+
+    def testAselFalseFieldsTrue(self):
+        """allowSingleElementLists(False) and showEmptyFields(True)"""
+        pkts = pyshark.iter(self.filename,
+                            ['tcp.dstport', 'frame.number', 'arp.hw.type', 'udp.srcport', 'tcp.srcport'],
+                            '')
+
+        pkts.allowSingleElementLists(False)
+        pkts.showEmptyFields(True)
+
+        pktlistref = [
+            {'frame.number': 1, 'tcp.srcport': None, 'tcp.dstport': None, 'arp.hw.type': None, 'udp.srcport': 60000},
+            {'frame.number': 2, 'tcp.srcport': None, 'tcp.dstport': None, 'arp.hw.type': None, 'udp.srcport': 60000},
+            {'frame.number': 3, 'tcp.srcport': None, 'tcp.dstport': None, 'arp.hw.type': 1, 'udp.srcport': None},
+            {'frame.number': 4, 'tcp.srcport': None, 'tcp.dstport': None, 'arp.hw.type': 1, 'udp.srcport': None},
+            {'frame.number': 5, 'tcp.srcport': None, 'tcp.dstport': None, 'arp.hw.type': 1, 'udp.srcport': None},
+            {'frame.number': 6, 'tcp.srcport': None, 'tcp.dstport': None, 'arp.hw.type': None, 'udp.srcport': 60000}]
+        
+        pktlist = []
+
+        for i in range(1, 7):
+            pkt = pkts.next()
+            pktlist.append(pkt)
+
+        self.failUnless(pktlist == pktlistref)
+        
+
+    def testAselFalseFieldsFalse(self):
+        """allowSingleElementLists(False) and showEmptyFields(False)"""
+        pkts = pyshark.iter(self.filename,
+                            ['tcp.dstport', 'frame.number', 'arp.hw.type', 'udp.srcport', 'tcp.srcport'],
+                            '')
+
+        pkts.allowSingleElementLists(False)
+        pkts.showEmptyFields(False)
+
+        pktlistref = [
+            {'frame.number': 1, 'udp.srcport': 60000},
+            {'frame.number': 2, 'udp.srcport': 60000},
+            {'frame.number': 3, 'arp.hw.type': 1},
+            {'frame.number': 4, 'arp.hw.type': 1},
+            {'frame.number': 5, 'arp.hw.type': 1},
+            {'frame.number': 6, 'udp.srcport': 60000}
+            ]
+                
+        pktlist = []
+        # We only need to look at the first 6 packets for this test
+        for i in range(1, 7):
+            pkt = pkts.next()
+            pktlist.append(pkt)
+
+        self.failUnless(pktlist == pktlistref)
+
+    def tefstPySharkCrazyStuff(self):
         """Crazy"""
         pkts = pyshark.iter(self.filename,
-                            ['frame.number', 'eth.type', 'udp.srcport', 'tcp.srcport'],
-                            'udp')
+                            #['frame.number', 'eth.type', 'udp.srcport', 'tcp.srcport'],
+                            ['frame.number', 'arp.hw.type', 'udp.srcport'],
+                            '')
         print dir(pkts)
         print pkts.allowSingleElementLists.__doc__
         print "default = %s" % pkts.allowSingleElementLists()
         print "changing...%s" % pkts.allowSingleElementLists(False)
         print "changed = %s" % pkts.allowSingleElementLists()
-        print "default = %s" % pkts.allowNoneElements()
-        print "changing...%s" % pkts.allowNoneElements(False)
-        print "changed = %s" % pkts.allowNoneElements()
+        print "default = %s" % pkts.showEmptyFields()
+        print "changing...%s" % pkts.showEmptyFields(False)
+        print "changed = %s" % pkts.showEmptyFields()
         count = 0
+        print pkts.next()
+        print pkts.next()
         print pkts.next()
         print pkts.next()
         print pkts.next()
