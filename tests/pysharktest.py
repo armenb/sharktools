@@ -291,12 +291,18 @@ NB: of the 6 packets, first 2 packets are UDP, then 3 ARP packets, then 1 UDP
         pkts.showEmptyFields(True)
 
         pktlistref = [
-            {'frame.number': 1, 'tcp.srcport': None, 'tcp.dstport': None, 'arp.hw.type': None, 'udp.srcport': 60000},
-            {'frame.number': 2, 'tcp.srcport': None, 'tcp.dstport': None, 'arp.hw.type': None, 'udp.srcport': 60000},
-            {'frame.number': 3, 'tcp.srcport': None, 'tcp.dstport': None, 'arp.hw.type': 1, 'udp.srcport': None},
-            {'frame.number': 4, 'tcp.srcport': None, 'tcp.dstport': None, 'arp.hw.type': 1, 'udp.srcport': None},
-            {'frame.number': 5, 'tcp.srcport': None, 'tcp.dstport': None, 'arp.hw.type': 1, 'udp.srcport': None},
-            {'frame.number': 6, 'tcp.srcport': None, 'tcp.dstport': None, 'arp.hw.type': None, 'udp.srcport': 60000}]
+            {'frame.number': 1, 'tcp.srcport': None, 'tcp.dstport': None,
+             'arp.hw.type': None, 'udp.srcport': 60000},
+            {'frame.number': 2, 'tcp.srcport': None, 'tcp.dstport': None,
+             'arp.hw.type': None, 'udp.srcport': 60000},
+            {'frame.number': 3, 'tcp.srcport': None, 'tcp.dstport': None,
+             'arp.hw.type': 1, 'udp.srcport': None},
+            {'frame.number': 4, 'tcp.srcport': None, 'tcp.dstport': None,
+             'arp.hw.type': 1, 'udp.srcport': None},
+            {'frame.number': 5, 'tcp.srcport': None, 'tcp.dstport': None,
+             'arp.hw.type': 1, 'udp.srcport': None},
+            {'frame.number': 6, 'tcp.srcport': None, 'tcp.dstport': None,
+             'arp.hw.type': None, 'udp.srcport': 60000}]
         
         pktlist = []
 
@@ -331,6 +337,40 @@ NB: of the 6 packets, first 2 packets are UDP, then 3 ARP packets, then 1 UDP
             pkt = pkts.next()
             pktlist.append(pkt)
 
+        self.failUnless(pktlist == pktlistref)
+
+    def testWildcardAselFalseFieldsFalse(self):
+        """Wildcard version of allowSingleElementLists(False) and showEmptyFields(False)"""
+        pkts = pyshark.iter(self.filename,
+                            ['tcp.dstport', 'udp.*', 'arp.hw.type', 'udp.srcport', 'tcp.srcport'],
+                            '')
+
+        pkts.allowSingleElementLists(False)
+        pkts.showEmptyFields(False)
+
+        pktlistref = [
+            {'udp.checksum_coverage': 9, 'udp.length': 9, 'udp.checksum_bad': False,
+             'udp.checksum': 5072, 'udp.dstport': 60000, 'udp.srcport': 60000,
+             'udp.port': [60000, 60000], 'udp.checksum_good': True},
+            {'udp.checksum_coverage': 9, 'udp.length': 9, 'udp.checksum_bad': False,
+             'udp.checksum': 5077, 'udp.dstport': 60000, 'udp.srcport': 60000,
+             'udp.port': [60000, 60000], 'udp.checksum_good': True},
+            {'arp.hw.type': 1},
+            {'arp.hw.type': 1},
+            {'arp.hw.type': 1},
+            {'udp.checksum_coverage': 9, 'udp.length': 9, 'udp.checksum_bad': False,
+             'udp.checksum': 5086, 'udp.dstport': 60000, 'udp.srcport': 60000,
+             'udp.port': [60000, 60000], 'udp.checksum_good': True}
+            ]
+                
+        pktlist = []
+        # We only need to look at the first 6 packets for this test
+        for i in range(1, 7):
+            pkt = pkts.next()
+            pktlist.append(pkt)
+
+        #print pktlist
+        
         self.failUnless(pktlist == pktlistref)
 
     def tefstPySharkCrazyStuff(self):
