@@ -142,12 +142,26 @@ pyshark will insert a None object in its place.
 
 >>> import pyshark
 >>> b = pyshark.read('capture1.pcap', ['frame.number', 'ip.version', 'tcp.seq', 'udp.dstport', 'frame.len'], 'ip.version eq 4')
+>>> b = list(b)
 >>> b[2]
 {'frame.number': 6, 'tcp.seq': None, 'frame.len': 60, 'udp.dstport': 60000, 'ip.version': 4}
 >>> c = pyshark.read('capture1.pcap', ['frame.number', 'frame.time', 'frame.time_relative', 'frame.len', 'frame.protocols'], '' )
+>>> c = list(c)
 >>> c[8]
 {'frame.number': 9, 'frame.len': 60, 'frame.time': 1066402442.768941, 'frame.time_relative': 0.022801999999999999, 'frame.protocols': None}
 >>>
+
+== Python Iterators ==
+
+Pyshark now uses Python iterators to reduce memory footprint.  To quickly adapt
+older code, execute "foo = list(foo)" on the data structure "foo" returned by
+pyshark.read().  Read up on how iterators can make your life easier here:
+
+http://www.ibm.com/developerworks/library/l-pycon/index.html
+
+You may also wish to search for Normal Matloff's "PyIterGen.pdf" file on the web.
+
+
 
 == Using Wireshark's "Decode As" feature ==
 
@@ -393,22 +407,33 @@ does.
 
 == Future work ==
 
-Fixing memory leaks, of course.
+Python:
+* More/better unit tests for pyshark
 
-The Python wrapper could use more miles of use. Send Armen feedback!
+Matlab:
+* Add support for Matlab iterators in matshark
+* At least some unit tests for matshark (there's an MUNIT test framework)
 
-The Python implementation currently does not use Python iterators.  By doing
-so, we could be much more memory efficient. More information about python
-iterators is at:
+Perl:
+* Integrate perlshark code that someone else already wrote
 
-  http://www.ibm.com/developerworks/library/l-pycon.html
-  http://heather.cs.ucdavis.edu/~matloff/Python/PyIterGen.pdf
-
-At the moment, if a dissector field name appears more than once in a packet,
-only one of the fields is displayed (usually the latter field).  Future work
-could involve returning an ordered list of these processed packet fields.
+General:
+* Fixing memory leaks, of course.
+* Integrate into main Wireshark package as extshark
+* ??? Suggestions are welcome!
 
 These past TODO items have already been addressed:
+
+*The Python implementation currently does not use Python iterators.  By doing
+*so, we could be much more memory efficient. More information about python
+*iterators is at:
+*
+*  http://www.ibm.com/developerworks/library/l-pycon.html
+*  http://heather.cs.ucdavis.edu/~matloff/Python/PyIterGen.pdf
+
+*At the moment, if a dissector field name appears more than once in a packet,
+*only one of the fields is displayed (usually the latter field).  Future work
+*could involve returning an ordered list of these processed packet fields.
 
 *Identified inefficiency:  some data types are rendered as strings, only to be
 *rendered back by pyshark or matshark.  This definitely does not need to happen
