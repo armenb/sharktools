@@ -122,12 +122,10 @@ typedef struct
   GHashTable* field_indicies;
 
   /**
-   * 'field_values_str' holds an ordered list of values (strings) found for
+   * 'tree_values' holds an ordered list of values found for
    * a particular packet.
    */
-  const gchar** field_values_str;
-
-  fvalue_t **field_values_native;
+  GPtrArray* tree_values;
 
   /**
    * 'field_types' holds an ordered list of data types (enum, in
@@ -390,13 +388,10 @@ static void stdata_init(st_data_t* stdata, gulong nfields)
   //stdata.field_values_str = ep_alloc_array0(const gchar*, stdata.fields->len);
   //stdata.field_types = ep_alloc_array0(gulong, stdata.fields->len);
 
-  /* Buffers to store types and values for each packet */
-  stdata->field_values_str = g_new(const gchar*, nfields);
-
-  stdata->field_values_native = g_new(fvalue_t*, nfields);
+  stdata->tree_values = g_ptr_array_new();
   for(i = 0; i < nfields; i++)
     {
-      stdata->field_values_native[i] = g_new(fvalue_t, 1);
+      g_ptr_array_add( stdata->tree_values, g_ptr_array_new() ); 
     }
 
   stdata->field_types = g_new(gulong, nfields);
@@ -417,11 +412,10 @@ static void stdata_cleanup(st_data_t* stdata)
 
   for(i = 0; i < stdata->fields->len; i++)
     {
-      g_free(stdata->field_values_native[i]);
+      g_ptr_array_free( g_ptr_array_index(stdata->tree_values, i), TRUE);
     }
-  g_free(stdata->field_values_native);
+  g_ptr_array_free( stdata->tree_values, TRUE);
 
-  g_free(stdata->field_values_str);
 
   if(NULL != stdata->field_indicies)
     {
@@ -592,29 +586,43 @@ static void proto_tree_get_node_field_values(proto_node *node, gpointer data)
           dprintf("string is: %s\n", (char*)fvalue_get(&(fi->value)));
           dprintf("string as gnfvas: %s\n", get_node_field_value_as_string(fi, args->edt));
 
+          val_str = get_node_field_value_as_string(fi, args->edt); 
+	  g_ptr_array_add( g_ptr_array_index(args->stdata->tree_values, actual_index), val_str);
         }
 
       if(type == FT_NONE)
         {
-	  args->stdata->field_values_str[actual_index] = NULL;
-	  args->stdata->field_values_native[actual_index] = 0;
 	  args->stdata->field_types[actual_index] = FT_NONE;
+	  //check repr
+    	  if(  fi->rep ){
+   	  	val_str = g_strdup( fi->rep->representation ); 
+	    g_ptr_array_add( g_ptr_array_index(args->stdata->tree_values, actual_index), val_str );
+	    args->stdata->field_types[actual_index] = FT_STRING;
+	  }
         }
       else if(is_native_type(type) == TRUE)
         {
           // If we can natively store the type,
           // do that and don't convert to a string
-	  args->stdata->field_values_str[actual_index] = NULL;
-          memcpy(args->stdata->field_values_native[actual_index], &(fi->value), sizeof(fvalue_t));
 	  args->stdata->field_types[actual_index] = type;
+
+	  fvalue_t* tmp = g_new(fvalue_t,1);
+          memcpy(tmp, &(fi->value), sizeof(fvalue_t));
+	
+	  g_ptr_array_add( g_ptr_array_index(args->stdata->tree_values, actual_index), tmp );
         }
       else
         {
           // As a last ditch options, convert the value to a string,
           // and don't bother storing the native type
           val_str = get_node_field_value_as_string(fi, args->edt); 
-	  args->stdata->field_values_str[actual_index] = val_str;
-	  args->stdata->field_types[actual_index] = type;
+	  if( strlen(val_str) > 0 ){
+	    args->stdata->field_types[actual_index] = FT_STRING;
+	  }else{
+	    args->stdata->field_types[actual_index] = type;
+	  }
+
+	  g_ptr_array_add( g_ptr_array_index(args->stdata->tree_values, actual_index), val_str);
         }
     }
 
@@ -659,6 +667,8 @@ static const gchar* get_node_field_value_as_string(field_info* fi, epan_dissect_
       
       switch (fi->hfinfo->type)
 	{
+	case FT_NONE:
+	  return NULL;
 	case FT_PROTOCOL:
 	  /* Print out the full details for the protocol. */
 	  if (fi->rep)
@@ -670,8 +680,6 @@ static const gchar* get_node_field_value_as_string(field_info* fi, epan_dissect_
 	      /* Just print out the protocol abbreviation */
 	      return fi->hfinfo->abbrev;;
 	    }
-	case FT_NONE:
-	  return NULL;
 	default:
 	  /* XXX - this is a hack until we can just call
 	   * fvalue_to_string_repr() for *all* FT_* types. */
@@ -1129,7 +1137,6 @@ glong sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
 
   dprintf("stdata.fields->len = %d\n", stdata.fields->len);
 
-  dprintf("stdata.field_values_str = %lX\n", (glong)stdata.field_values_str);
   dprintf("stdata.field_types = %lX\n", (glong)stdata.field_types);
   
   dprintf("%s: opened file\n", __FUNCTION__);
@@ -1147,7 +1154,6 @@ glong sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
       // (Re)-set all the stdata.field_{values,types} fields
       for(i = 0; i < nfields; i++)
         {
-          stdata.field_values_str[i] = 0;
           stdata.field_types[i] = FT_NONE;
         }
 
@@ -1157,6 +1163,7 @@ glong sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
 
       if(passed)
 	{
+	dprintf("found!\n)");
           gpointer row = cb->row_new(cb);
 
 	  for(i = 0; i < nfields; i++)
@@ -1166,17 +1173,22 @@ glong sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
 
               dprintf("key = %p\n", key);
 
-	      dprintf("values[%ld] = %p\n", i, stdata.field_values_str[i]);
 	      dprintf("types[%ld] = %ld\n", i, stdata.field_types[i]);
 
               cb->row_set(cb, row, key,
                           stdata.field_types[i],
-                          stdata.field_values_native[i],
-                          stdata.field_values_str[i]
+			  g_ptr_array_index( stdata.tree_values, i)
                           );
             }
 
           cb->row_add(cb, row);
+  	  //reset tree_values
+      	  g_ptr_array_free( stdata.tree_values, TRUE);
+	  stdata.tree_values = g_ptr_array_new();
+	  for(i = 0; i < nfields; i++)
+	    {
+      		g_ptr_array_add( stdata.tree_values, g_ptr_array_new() ); 
+	    }
         }
     }
 
