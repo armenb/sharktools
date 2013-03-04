@@ -42,28 +42,13 @@
 void
 cap_file_init(capture_file *cf)
 {
-  /* Initialize the capture file struct */
-#if WIRESHARK_1_4_0
-  cf->plist_start	= NULL;
-#else
-  cf->plist		= NULL;
-#endif
-  cf->plist_end	= NULL;
-  cf->wth		= NULL;
-  cf->filename	= NULL;
-#if WIRESHARK_1_4_0
-  cf->source = NULL;
-#endif
-  cf->user_saved	= FALSE;
-  cf->is_tempfile	= FALSE;
-  cf->rfcode		= NULL;
-  cf->dfilter		= NULL;
-  cf->has_snap	= FALSE;
+  /*
+    Keeping this initialization routine
+    updated across various versions of wireshark
+    was a bit messy, and there really isn't any
+    point to it, because everything gets set to 0
+    besides the frame length
+  */
+  memset(cf, 0, sizeof(capture_file));
   cf->snap		= WTAP_MAX_PACKET_SIZE;
-  cf->count		= 0;
-#if WIRESHARK_1_4_0
-  cf->redissecting  = FALSE;
-#else
-  cf->pstats		= NULL;
-#endif
 }

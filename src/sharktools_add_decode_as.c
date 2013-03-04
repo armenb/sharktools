@@ -225,7 +225,7 @@ add_decode_as(const gchar *cl_param)
 
   case FT_STRING:
   case FT_STRINGZ:
-#ifndef WIRESHARK_0_99_6_OR_EARLIER
+#if !(WIRESHARK_0_99_6_OR_EARLIER || WIRESHARK_1_8_0)
   case FT_EBCDIC:
 #endif
     /* The selector for this table is a string. */
@@ -322,7 +322,7 @@ add_decode_as(const gchar *cl_param)
 
   case FT_STRING:
   case FT_STRINGZ:
-#ifndef WIRESHARK_0_99_6_OR_EARLIER
+#if !(WIRESHARK_0_99_6_OR_EARLIER || WIRESHARK_1_8_0)
   case FT_EBCDIC:
 #endif
     /* The selector for this table is a string. */
@@ -466,7 +466,7 @@ remove_decode_as(const gchar *cl_param)
 
   case FT_STRING:
   case FT_STRINGZ:
-#ifndef WIRESHARK_0_99_6_OR_EARLIER
+#if !(WIRESHARK_0_99_6_OR_EARLIER || WIRESHARK_1_8_0)
   case FT_EBCDIC:
 #endif
     /* The selector for this table is a string. */
@@ -563,7 +563,7 @@ remove_decode_as(const gchar *cl_param)
 
   case FT_STRING:
   case FT_STRINGZ:
-#ifndef WIRESHARK_0_99_6_OR_EARLIER
+#if !(WIRESHARK_0_99_6_OR_EARLIER || WIRESHARK_1_8_0)
   case FT_EBCDIC:
 #endif
     /* The selector for this table is a string. */

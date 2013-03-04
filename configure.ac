@@ -1,14 +1,14 @@
 # configure.ac file for sharktools
 #
-# Questions: Armen Babikyan <armenb@ll.mit.edu>
+# Questions: Armen Babikyan <armenb@static.net>
 #
 # NB: After editing this file, run "autoconf" to generate a
 # new ./configure script
 
 AC_PREREQ(2.59)
 
-AC_INIT(sharktools, 0.1.5, armenb@mit.edu)
-AM_INIT_AUTOMAKE(sharktools, 0.1.5)
+AC_INIT(sharktools, 0.1.8, armenb@static.net)
+AM_INIT_AUTOMAKE(sharktools, 0.1.8)
 
 #AC_CONFIG_HEADER([src/sharktools_config.h])
 
@@ -51,7 +51,7 @@ AC_ARG_ENABLE(debug,
 #AC_DEFINE([WIRESHARK_1_4_0], [], [Use Wireshark 1.4.* support])
 
 AC_DEFINE(DEBUG,[0], [Turn debugging on or off])
-if test debug = "true";
+if test ${debug} = "true";
 then
    AC_DEFINE(DEBUG,[1])
 fi
@@ -324,14 +324,22 @@ elif test $WIRESHARK_VERSION_MAJOR == 1; then
       echo "Configuring for Wireshark 1.4.*"
       AC_DEFINE(WIRESHARK_1_4_0)
       WIRESHARK_LIBS="$WIRESHARK_LIBS -lwsutil"
+   elif test $WIRESHARK_VERSION_MINOR == 6; then
+      echo "Configuring for Wireshark 1.6.*"
+      AC_DEFINE(WIRESHARK_1_6_0)
+      WIRESHARK_LIBS="$WIRESHARK_LIBS -lwsutil"
+   elif test $WIRESHARK_VERSION_MINOR == 8; then
+      echo "Configuring for Wireshark 1.8.*"
+      AC_DEFINE(WIRESHARK_1_8_0)
+      WIRESHARK_LIBS="$WIRESHARK_LIBS -lwsutil"
    else
-      echo "Configuring for Wireshark 1.4.*"
-      AC_MSG_WARN(wireshark version is really new! Trying 1.4.0 support...)
-      AC_DEFINE(WIRESHARK_1_4_0)
+      echo "Configuring for Wireshark 1.8.*"
+      AC_MSG_WARN(wireshark version is really new! Trying 1.8.0 support...)
+      AC_DEFINE(WIRESHARK_1_8_0)
    fi
 else
-   AC_MSG_WARN(wireshark version is really, really new! Trying 1.4.0 support...)
-   AC_DEFINE(WIRESHARK_1_4_0)
+   AC_MSG_WARN(wireshark version is really, really new! Trying 1.8.0 support...)
+   AC_DEFINE(WIRESHARK_1_8_0)
 fi
 
 
@@ -494,9 +502,9 @@ then
       AC_SUBST(MEXARCH)
    fi
    AC_SUBST(MEXEXT)
+   echo MEXARCH=$MEXARCH
+   echo MEXEXT=$MEXEXT
 fi
-echo MEXARCH=$MEXARCH
-echo MEXEXT=$MEXEXT
 
 AC_SUBST(WIRESHARK_CFLAGS)
 

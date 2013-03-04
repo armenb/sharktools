@@ -44,6 +44,10 @@
 #include <stdio.h>
 #include <glib.h>
 
+#if WIRESHARK_1_8_0
+#define WS_MSVC_NORETURN
+#endif
+
 #define WS_VAR_IMPORT extern
 #include <epan/ftypes/ftypes.h>
 
@@ -60,6 +64,12 @@
 #include "sharktools_frame_data.h"
 #include "sharktools_cfile.h"
 #endif /* (WIRESHARK_0_99_5 || WIRESHARK_1_0_0 || WIRESHARK_1_2_0) */
+
+#if WIRESHARK_1_8_0
+#include <epan/dfilter/dfilter.h>
+#include <epan/frame_data.h>
+#include <cfile.h>
+#endif
 
 typedef struct _ret_info {
   GPtrArray *values;

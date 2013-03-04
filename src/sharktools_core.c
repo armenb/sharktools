@@ -69,7 +69,7 @@
  */
 #if WIRESHARK_1_0_0
 #include <epan/privileges.h> 
-#elif (WIRESHARK_1_2_0 || WIRESHARK_1_4_0)
+#elif (WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_8_0)
 #include <wsutil/privileges.h>
 #endif
 
@@ -182,6 +182,7 @@ static const char *cf_open_error_message(int err, gchar *err_info, int file_type
 	  errmsg = "The file \"%s\" is a capture for a network type that Sharktools doesn't support.";
 	  break;
 	  
+#if WIRESHARK_1_8_0 != 1
 	case WTAP_ERR_BAD_RECORD:
 	  /* Seen only when opening a capture file for reading. */
 	  g_snprintf(errmsg_errno, sizeof(errmsg_errno),
@@ -190,6 +191,7 @@ static const char *cf_open_error_message(int err, gchar *err_info, int file_type
 	  g_free(err_info);
 	  errmsg = errmsg_errno;
 	  break;
+#endif
 	  
 	case WTAP_ERR_CANT_OPEN:
 	  errmsg = "The file \"%s\" could not be opened for some unknown reason.";
@@ -233,7 +235,7 @@ cf_status_t cf_open(capture_file *cf, const char *fname, gboolean is_tempfile, i
 
   /* The open succeeded.  Fill in the information for this file. */
 
-#if WIRESHARK_1_4_0
+#if (WIRESHARK_1_4_0 || WIRESHARK_1_8_0)
   /* Cleanup all data structures used for dissection. */
   cleanup_dissection();
 #endif
@@ -252,8 +254,13 @@ cf_status_t cf_open(capture_file *cf, const char *fname, gboolean is_tempfile, i
   /* Indicate whether it's a permanent or temporary file. */
   cf->is_tempfile = is_tempfile;
 
+#if WIRESHARK_1_8_0
+  /* No user changes yet. */
+  cf->unsaved_changes = FALSE;
+#else
   /* If it's a temporary capture buffer file, mark it as not saved. */
   cf->user_saved = !is_tempfile;
+#endif
 
   cf->cd_t      = wtap_file_type(cf->wth);
   cf->count     = 0;
@@ -272,6 +279,15 @@ cf_status_t cf_open(capture_file *cf, const char *fname, gboolean is_tempfile, i
   nstime_set_unset(&first_ts);
   nstime_set_unset(&prev_dis_ts);
   nstime_set_unset(&prev_cap_ts);
+
+#if WIRESHARK_1_4_0
+  cf->state = FILE_READ_IN_PROGRESS;
+
+ #if WIRESHARK_1_8_0
+  wtap_set_cb_new_ipv4(cf->wth, add_ipv4_name);
+  wtap_set_cb_new_ipv6(cf->wth, (wtap_new_ipv6_callback_t) add_ipv6_name);
+ #endif
+#endif
 
   dprintf("%s: exiting\n", __FUNCTION__);
 
@@ -314,7 +330,7 @@ read_failure_message(const char *filename, int err)
           filename, strerror(err));
 }
 
-#if (WIRESHARK_1_2_0 || WIRESHARK_1_4_0)
+#if (WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_8_0)
 /*
  * Write errors are reported with an console message in Sharktools.
  */
@@ -324,7 +340,7 @@ write_failure_message(const char *filename, int err)
   dprintf("An error occurred while writing to the file \"%s\": %s.",
           filename, strerror(err));
 }
-#endif //(WIRESHARK_1_2_0 || WIRESHARK_1_4_0)
+#endif //(WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_8_0)
 
 static void
 stdata_init_old(st_data_t* stdata, gulong nfields)
@@ -418,6 +434,7 @@ stdata_init(st_data_t* stdata)
  * Here we cleanup stdata by deallocating it's members in reverse order of 
  * allocation.
  */
+#if 0
 static void
 stdata_cleanup_old(st_data_t* stdata)
 {
@@ -454,6 +471,7 @@ stdata_cleanup_old(st_data_t* stdata)
 
 
 }
+#endif
 
 /**
  * Here we cleanup stdata by deallocating it's members in reverse order of 
@@ -1105,11 +1123,13 @@ int sharktools_init(void)
   // FIXME: Hacky; see note above.
   sharktools_preload_libs();
 
-#if (WIRESHARK_1_0_0 || WIRESHARK_1_2_0 || WIRESHARK_1_4_0)
   /*
    * Get credential information for later use.
    */
+#if (WIRESHARK_1_0_0 || WIRESHARK_1_2_0 || WIRESHARK_1_4_0)
   get_credential_info();
+#elif WIRESHARK_1_8_0
+  init_process_policies();
 #endif
   
   dprintf("%s: initializing...\n", __FUNCTION__);
@@ -1120,7 +1140,7 @@ int sharktools_init(void)
 #elif WIRESHARK_1_0_0
   epan_init(register_all_protocols, register_all_protocol_handoffs, NULL, NULL,
             failure_message, open_failure_message, read_failure_message);
-#elif (WIRESHARK_1_2_0 || WIRESHARK_1_4_0)
+#elif (WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_8_0)
   epan_init(register_all_protocols, register_all_protocol_handoffs, NULL, NULL,
             failure_message, open_failure_message, read_failure_message, write_failure_message);
 #endif

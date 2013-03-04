@@ -1,4 +1,4 @@
-#!/usr/bin/env python26
+#!/usr/bin/env python
 #
 # Unit tests for lists. This example shows how subclassing can be used in
 # order to re-use test code wth different test objects. Comments in this
