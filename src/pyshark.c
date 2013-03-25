@@ -473,7 +473,14 @@ my_ht_foreach_fn(gpointer key, gpointer value, gpointer user_data)
   gulong type = (gulong)g_hash_table_lookup(wtree_type_hash, key);
 
   PyObject *valueobj = pyshark_getValueWithType(wtree_values, type, asel, show_empty_fields);
-  
+
+  /* a NULL valueobj means we do not want the "empty" value to appear in the
+   * result; so skip it.
+   */
+  if (!valueobj) {
+    return;
+  }
+
   if(PyDict_SetItem(dictobj, keyobj, valueobj) != 0) {
     PyErr_SetString(PySharkError, "Adding key/value pair to dictionary failed\n");
   }
