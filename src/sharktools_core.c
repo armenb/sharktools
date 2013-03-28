@@ -877,7 +877,9 @@ static const gchar* get_node_field_value_as_string(field_info* fi, epan_dissect_
 	  else
 	    {
 	      /* Just print out the protocol abbreviation */
-	      return fi->hfinfo->abbrev;;
+	      //return fi->hfinfo->abbrev;;
+        /* HACK - get the hex values - more useful than the abbrev */
+	      return get_field_hex_value2(edt->pi.data_src, fi);
 	    }
 	default:
 	  /* XXX - this is a hack until we can just call
