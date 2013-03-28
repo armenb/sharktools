@@ -95,6 +95,13 @@ if [ test "x$(uname)" == "xDarwin" ] ; then
    AC_MSG_RESULT(yes) # "for MacOSX"
 
    ###### Collect a bunch of information ######
+   
+   # Set the homebrew path
+   AC_ARG_WITH([brew],
+               AC_HELP_STRING([--with-brew=@<:@DIR@:>@],
+                              [MacOSX only, default /usr/local]),
+               [brew_path="$withval"],
+               [brew_path="/usr/local"])
 
    # Set the fink path
    AC_ARG_WITH([fink],
@@ -120,6 +127,24 @@ if [ test "x$(uname)" == "xDarwin" ] ; then
    #AC_CHECK_FILE($fink_path/bin/fink,
    #              [FINK=$fink_path/bin/fink],
    #              [no])
+
+   # See if brew actually exists
+   AC_MSG_CHECKING(for brew)
+   if [ test -e $brew_path/bin/brew ] ; then
+      AC_MSG_RESULT(yes: $brew_path/bin/brew)
+
+      # See if Wireshark exists in brew
+      AC_MSG_CHECKING(for Wireshark in brew)
+      if [ test -e $brew_path/bin/wireshark ] ; then
+         AC_MSG_RESULT(yes: $brew_path/bin/wireshark)
+         WIRESHARK_BREW="$brew_path/bin/wireshark"
+      else
+         AC_MSG_RESULT(no)
+         WIRESHARK_BREW="no"
+      fi
+   else
+      AC_MSG_RESULT(no)
+   fi
 
    # See if fink actually exists
    AC_MSG_CHECKING(for fink)
