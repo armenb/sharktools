@@ -69,7 +69,7 @@
  */
 #if WIRESHARK_1_0_0
 #include <epan/privileges.h> 
-#elif (WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_8_0)
+#elif (WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_6_0 || WIRESHARK_1_8_0)
 #include <wsutil/privileges.h>
 #endif
 
@@ -235,7 +235,7 @@ cf_status_t cf_open(capture_file *cf, const char *fname, gboolean is_tempfile, i
 
   /* The open succeeded.  Fill in the information for this file. */
 
-#if (WIRESHARK_1_4_0 || WIRESHARK_1_8_0)
+#if (WIRESHARK_1_4_0 || WIRESHARK_1_6_0 || WIRESHARK_1_8_0)
   /* Cleanup all data structures used for dissection. */
   cleanup_dissection();
 #endif
@@ -283,7 +283,7 @@ cf_status_t cf_open(capture_file *cf, const char *fname, gboolean is_tempfile, i
 #if WIRESHARK_1_4_0
   cf->state = FILE_READ_IN_PROGRESS;
 
- #if WIRESHARK_1_8_0
+ #if WIRESHARK_1_6_0 || WIRESHARK_1_8_0
   wtap_set_cb_new_ipv4(cf->wth, add_ipv4_name);
   wtap_set_cb_new_ipv6(cf->wth, (wtap_new_ipv6_callback_t) add_ipv6_name);
  #endif
@@ -330,7 +330,7 @@ read_failure_message(const char *filename, int err)
           filename, strerror(err));
 }
 
-#if (WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_8_0)
+#if (WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_6_0 || WIRESHARK_1_8_0)
 /*
  * Write errors are reported with an console message in Sharktools.
  */
@@ -340,7 +340,7 @@ write_failure_message(const char *filename, int err)
   dprintf("An error occurred while writing to the file \"%s\": %s.",
           filename, strerror(err));
 }
-#endif //(WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_8_0)
+#endif //(WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_6_0 || WIRESHARK_1_8_0)
 
 static void
 stdata_init_old(st_data_t* stdata, gulong nfields)
@@ -1130,7 +1130,7 @@ int sharktools_init(void)
    */
 #if (WIRESHARK_1_0_0 || WIRESHARK_1_2_0 || WIRESHARK_1_4_0)
   get_credential_info();
-#elif WIRESHARK_1_8_0
+#elif (WIRESHARK_1_6_0 || WIRESHARK_1_8_0)
   init_process_policies();
 #endif
   
@@ -1142,7 +1142,7 @@ int sharktools_init(void)
 #elif WIRESHARK_1_0_0
   epan_init(register_all_protocols, register_all_protocol_handoffs, NULL, NULL,
             failure_message, open_failure_message, read_failure_message);
-#elif (WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_8_0)
+#elif (WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_6_0 || WIRESHARK_1_8_0)
   epan_init(register_all_protocols, register_all_protocol_handoffs, NULL, NULL,
             failure_message, open_failure_message, read_failure_message, write_failure_message);
 #endif
