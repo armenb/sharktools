@@ -325,13 +325,12 @@ AC_CHECK_FILE($WIRESHARK_CONFIG_H_FILE,
 
 WIRESHARK_CFLAGS="-I$with_wireshark_src -I$with_wireshark_src/wiretap"
 
-TMP=$(grep "#define VERSION" $WIRESHARK_CONFIG_H_FILE)
-#echo TMP=$TMP
-
+TMP=$(grep "#define VERSION " $WIRESHARK_CONFIG_H_FILE)
+#echo $TMP
 #echo "'s/.*\ \\\"\(@<:@0-9@:>@@<:@0-9@:>@*\).\(@<:@0-9@:>@@<:@0-9@:>@*\)\.\(@<:@0-9@:>@@<:@0-9@:>@*\)\\\"/\1/g'"
-WIRESHARK_VERSION_MAJOR=$(echo $TMP | sed -e 's/.*\ \"\(@<:@0-9@:>@@<:@0-9@:>@*\).\(@<:@0-9@:>@@<:@0-9@:>@*\)\.\(@<:@0-9@:>@@<:@0-9@:>@*\)\"/\1/g')
-WIRESHARK_VERSION_MINOR=$(echo $TMP | sed -e 's/.*\ \"\(@<:@0-9@:>@@<:@0-9@:>@*\).\(@<:@0-9@:>@@<:@0-9@:>@*\)\.\(@<:@0-9@:>@@<:@0-9@:>@*\)\"/\2/g')
-WIRESHARK_VERSION_SUBMINOR=$(echo $TMP | sed -e 's/.*\ \"\(@<:@0-9@:>@@<:@0-9@:>@*\).\(@<:@0-9@:>@@<:@0-9@:>@*\)\.\(@<:@0-9@:>@@<:@0-9@:>@*\)\"/\3/g')
+WIRESHARK_VERSION_MAJOR=$(echo $TMP | sed -e 's/[[^0-9.]]*\([[0-9]]*\).\([[0-9]]*\).\([[0-9]]*\)\"/\1/g')
+WIRESHARK_VERSION_MINOR=$(echo $TMP | sed -e 's/[[^0-9.]]*\([[0-9]]*\).\([[0-9]]*\).\([[0-9]]*\)\"/\2/g')
+WIRESHARK_VERSION_SUBMINOR=$(echo $TMP | sed -e 's/[[^0-9.]]*\([[0-9]]*\).\([[0-9]]*\).\([[0-9]]*\)\"/\3/g')
 
 echo "Wireshark version detected: $WIRESHARK_VERSION_MAJOR.$WIRESHARK_VERSION_MINOR.$WIRESHARK_VERSION_SUBMINOR"
 
@@ -357,14 +356,18 @@ elif test $WIRESHARK_VERSION_MAJOR == 1; then
       echo "Configuring for Wireshark 1.8.*"
       AC_DEFINE(WIRESHARK_1_8_0)
       WIRESHARK_LIBS="$WIRESHARK_LIBS -lwsutil"
+   elif test $WIRESHARK_VERSION_MINOR == 10; then
+      echo "Configuring for Wireshark 1.10.*"
+      AC_DEFINE(WIRESHARK_1_10_0)
+      WIRESHARK_LIBS="$WIRESHARK_LIBS -lwsutil"
    else
-      echo "Configuring for Wireshark 1.8.*"
-      AC_MSG_WARN(wireshark version is really new! Trying 1.8.0 support...)
-      AC_DEFINE(WIRESHARK_1_8_0)
+      echo "Configuring for Wireshark 1.10.*"
+      AC_MSG_WARN((wireshark version is really new! Trying 1.10.0 support...))
+      AC_DEFINE(WIRESHARK_1_10_0)
    fi
 else
-   AC_MSG_WARN(wireshark version is really, really new! Trying 1.8.0 support...)
-   AC_DEFINE(WIRESHARK_1_8_0)
+   AC_MSG_WARN((wireshark version is really, really new! Trying 1.10.0 support...))
+   AC_DEFINE(WIRESHARK_1_10_0)
 fi
 
 

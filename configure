@@ -5274,13 +5274,12 @@ fi
 
 WIRESHARK_CFLAGS="-I$with_wireshark_src -I$with_wireshark_src/wiretap"
 
-TMP=$(grep "#define VERSION" $WIRESHARK_CONFIG_H_FILE)
-#echo TMP=$TMP
-
+TMP=$(grep "#define VERSION " $WIRESHARK_CONFIG_H_FILE)
+#echo $TMP
 #echo "'s/.*\ \\\"\([0-9][0-9]*\).\([0-9][0-9]*\)\.\([0-9][0-9]*\)\\\"/\1/g'"
-WIRESHARK_VERSION_MAJOR=$(echo $TMP | sed -e 's/.*\ \"\([0-9][0-9]*\).\([0-9][0-9]*\)\.\([0-9][0-9]*\)\"/\1/g')
-WIRESHARK_VERSION_MINOR=$(echo $TMP | sed -e 's/.*\ \"\([0-9][0-9]*\).\([0-9][0-9]*\)\.\([0-9][0-9]*\)\"/\2/g')
-WIRESHARK_VERSION_SUBMINOR=$(echo $TMP | sed -e 's/.*\ \"\([0-9][0-9]*\).\([0-9][0-9]*\)\.\([0-9][0-9]*\)\"/\3/g')
+WIRESHARK_VERSION_MAJOR=$(echo $TMP | sed -e 's/[^0-9.]*\([0-9]*\).\([0-9]*\).\([0-9]*\)\"/\1/g')
+WIRESHARK_VERSION_MINOR=$(echo $TMP | sed -e 's/[^0-9.]*\([0-9]*\).\([0-9]*\).\([0-9]*\)\"/\2/g')
+WIRESHARK_VERSION_SUBMINOR=$(echo $TMP | sed -e 's/[^0-9.]*\([0-9]*\).\([0-9]*\).\([0-9]*\)\"/\3/g')
 
 echo "Wireshark version detected: $WIRESHARK_VERSION_MAJOR.$WIRESHARK_VERSION_MINOR.$WIRESHARK_VERSION_SUBMINOR"
 
@@ -5311,17 +5310,22 @@ elif test $WIRESHARK_VERSION_MAJOR == 1; then
       $as_echo "#define WIRESHARK_1_8_0 1" >>confdefs.h
 
       WIRESHARK_LIBS="$WIRESHARK_LIBS -lwsutil"
+   elif test $WIRESHARK_VERSION_MINOR == 10; then
+      echo "Configuring for Wireshark 1.10.*"
+      $as_echo "#define WIRESHARK_1_10_0 1" >>confdefs.h
+
+      WIRESHARK_LIBS="$WIRESHARK_LIBS -lwsutil"
    else
-      echo "Configuring for Wireshark 1.8.*"
-      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: wireshark version is really new! Trying 1.8.0 support..." >&5
-$as_echo "$as_me: WARNING: wireshark version is really new! Trying 1.8.0 support..." >&2;}
-      $as_echo "#define WIRESHARK_1_8_0 1" >>confdefs.h
+      echo "Configuring for Wireshark 1.10.*"
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: (wireshark version is really new! Trying 1.10.0 support...)" >&5
+$as_echo "$as_me: WARNING: (wireshark version is really new! Trying 1.10.0 support...)" >&2;}
+      $as_echo "#define WIRESHARK_1_10_0 1" >>confdefs.h
 
    fi
 else
-   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: wireshark version is really" >&5
-$as_echo "$as_me: WARNING: wireshark version is really" >&2;}
-   $as_echo "#define WIRESHARK_1_8_0 1" >>confdefs.h
+   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: (wireshark version is really, really new! Trying 1.10.0 support...)" >&5
+$as_echo "$as_me: WARNING: (wireshark version is really, really new! Trying 1.10.0 support...)" >&2;}
+   $as_echo "#define WIRESHARK_1_10_0 1" >>confdefs.h
 
 fi
 
