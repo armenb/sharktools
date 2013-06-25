@@ -663,6 +663,12 @@ pyshark_Iter_iternext(PyObject *self)
 {
   pyshark_Iter *p = (pyshark_Iter *)self;
 
+  // catch access of iterator after last element (i.e. after the iterator has been cleaned up)
+  if (p->stdata == NULL) {
+      PyErr_SetNone(PyExc_StopIteration);
+      return NULL;
+  }
+
   gboolean pkt_exists = sharktools_iter_next(p->stdata);
   
   if(pkt_exists) {
