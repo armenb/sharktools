@@ -55,14 +55,16 @@
  * Contact: Armen Babikyan, MIT Lincoln Laboratory, <armenb@mit.edu>
  */
 
-#include "sharktools_core.h"
+#define WS_VAR_IMPORT extern
+#include <config.h>
+#include <epan/epan.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <pyshark.h>
 
-#define WS_VAR_IMPORT extern
-#include <epan/epan.h>
+#include "sharktools_core.h"
+#include "pyshark.h"
+
 
 extern char sharktools_errmsg[2048];
 

@@ -225,7 +225,7 @@ add_decode_as(const gchar *cl_param)
 
   case FT_STRING:
   case FT_STRINGZ:
-#if !(WIRESHARK_0_99_6_OR_EARLIER || WIRESHARK_1_8_0)
+#if !(WIRESHARK_0_99_6_OR_EARLIER || WIRESHARK_1_8_0 || WIRESHARK_1_10_0)
   case FT_EBCDIC:
 #endif
     /* The selector for this table is a string. */
@@ -317,12 +317,16 @@ add_decode_as(const gchar *cl_param)
   case FT_UINT24:
   case FT_UINT32:
     /* The selector for this table is an unsigned number. */
+#ifdef WIRESHARK_1_10_0
+    dissector_change_uint(table_name, selector, dissector_matching);
+#else
     dissector_change(table_name, selector, dissector_matching);
+#endif
     break;
 
   case FT_STRING:
   case FT_STRINGZ:
-#if !(WIRESHARK_0_99_6_OR_EARLIER || WIRESHARK_1_8_0)
+#if !(WIRESHARK_0_99_6_OR_EARLIER || WIRESHARK_1_8_0 || WIRESHARK_1_10_0)
   case FT_EBCDIC:
 #endif
     /* The selector for this table is a string. */
@@ -466,7 +470,7 @@ remove_decode_as(const gchar *cl_param)
 
   case FT_STRING:
   case FT_STRINGZ:
-#if !(WIRESHARK_0_99_6_OR_EARLIER || WIRESHARK_1_8_0)
+#if !(WIRESHARK_0_99_6_OR_EARLIER || WIRESHARK_1_8_0 || WIRESHARK_1_10_0)
   case FT_EBCDIC:
 #endif
     /* The selector for this table is a string. */
@@ -558,12 +562,16 @@ remove_decode_as(const gchar *cl_param)
   case FT_UINT24:
   case FT_UINT32:
     /* The selector for this table is an unsigned number. */
+#ifdef WIRESHARK_1_10_0
+    dissector_reset_uint(table_name, selector);
+#else
     dissector_reset(table_name, selector);
+#endif
     break;
 
   case FT_STRING:
   case FT_STRINGZ:
-#if !(WIRESHARK_0_99_6_OR_EARLIER || WIRESHARK_1_8_0)
+#if !(WIRESHARK_0_99_6_OR_EARLIER || WIRESHARK_1_8_0 || WIRESHARK_1_10_0)
   case FT_EBCDIC:
 #endif
     /* The selector for this table is a string. */

@@ -63,7 +63,8 @@ confirmed working on:
  - Ubuntu 10.04.1 LTS + Python 2.6.5 + Wireshark 1.2.7
  - MacOSX 10.6 + Python 2.4.3 + Wireshark 1.4.0 (see README.MacOSX)
  - MacOSX 10.6 + Matlab R2010a + Wireshark 1.4.0 (see README.MacOSX)
-
+ - MacOSX 10.8 + Python 2.7.3 + Wireshark 1.8.6 (see README.MacOSX)
+ - MacOSX 10.8 + Python 2.7.3 + Wireshark 1.10.0 (see README.MacOSX)
 See the FAQ below for answers to common problems/questions. For more
 information, contact Armen Babikyan (armenb@static.net).
 

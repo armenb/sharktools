@@ -44,7 +44,7 @@
 #include <stdio.h>
 #include <glib.h>
 
-#if WIRESHARK_1_8_0
+#if defined(WIRESHARK_1_8_0) || defined(WIRESHARK_1_10_0)
 #define WS_MSVC_NORETURN
 #endif
 
@@ -65,7 +65,7 @@
 #include "sharktools_cfile.h"
 #endif /* (WIRESHARK_0_99_5 || WIRESHARK_1_0_0 || WIRESHARK_1_2_0) */
 
-#if WIRESHARK_1_8_0
+#if defined(WIRESHARK_1_8_0) || defined(WIRESHARK_1_10_0)
 #include <epan/dfilter/dfilter.h>
 #include <epan/frame_data.h>
 #include <cfile.h>

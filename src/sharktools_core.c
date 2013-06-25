@@ -68,8 +68,8 @@
 /* APB: wireshark >= 1.0 wants get_credential_info(), which is located in privileges.h
  */
 #if WIRESHARK_1_0_0
-#include <epan/privileges.h> 
-#elif (WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_8_0)
+#include <epan/privileges.h>
+#elif (WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_8_0 || WIRESHARK_1_10_0)
 #include <wsutil/privileges.h>
 #endif
 
@@ -125,8 +125,16 @@ long verbose = 1;
 static guint32 cum_bytes = 0;
 
 static nstime_t first_ts;
+
+#ifdef WIRESHARK_1_10_0
+static frame_data *prev_dis;
+static frame_data prev_dis_frame;
+static frame_data *prev_cap;
+static frame_data prev_cap_frame;
+#else
 static nstime_t prev_dis_ts;
 static nstime_t prev_cap_ts;
+#endif
 
 static const char *cf_open_error_message(int err, gchar *err_info, int file_type)
 {
@@ -182,7 +190,7 @@ static const char *cf_open_error_message(int err, gchar *err_info, int file_type
 	  errmsg = "The file \"%s\" is a capture for a network type that Sharktools doesn't support.";
 	  break;
 	  
-#if WIRESHARK_1_8_0 != 1
+#if  (defined(WIRESHARK_1_8_0) == 0) && (defined(WIRESHARK_1_10_0) == 0)
 	case WTAP_ERR_BAD_RECORD:
 	  /* Seen only when opening a capture file for reading. */
 	  g_snprintf(errmsg_errno, sizeof(errmsg_errno),
@@ -254,7 +262,7 @@ cf_status_t cf_open(capture_file *cf, const char *fname, gboolean is_tempfile, i
   /* Indicate whether it's a permanent or temporary file. */
   cf->is_tempfile = is_tempfile;
 
-#if WIRESHARK_1_8_0
+#if defined(WIRESHARK_1_8_0) || defined(WIRESHARK_1_10_0)
   /* No user changes yet. */
   cf->unsaved_changes = FALSE;
 #else
@@ -277,13 +285,19 @@ cf_status_t cf_open(capture_file *cf, const char *fname, gboolean is_tempfile, i
     cf->has_snap = TRUE;
   nstime_set_zero(&cf->elapsed_time);
   nstime_set_unset(&first_ts);
+
+#ifdef WIRESHARK_1_10_0
+ prev_dis = NULL;
+ prev_cap = NULL;
+#else
   nstime_set_unset(&prev_dis_ts);
   nstime_set_unset(&prev_cap_ts);
+#endif
 
 #if WIRESHARK_1_4_0
   cf->state = FILE_READ_IN_PROGRESS;
 
- #if WIRESHARK_1_8_0
+ #if defined(WIRESHARK_1_8_0) || defined(WIRESHARK_1_10_0)
   wtap_set_cb_new_ipv4(cf->wth, add_ipv4_name);
   wtap_set_cb_new_ipv6(cf->wth, (wtap_new_ipv6_callback_t) add_ipv6_name);
  #endif
@@ -330,7 +344,7 @@ read_failure_message(const char *filename, int err)
           filename, strerror(err));
 }
 
-#if (WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_8_0)
+#if (WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_8_0 || WIRESHARK_1_10_0)
 /*
  * Write errors are reported with an console message in Sharktools.
  */
@@ -431,7 +445,7 @@ stdata_init(st_data_t* stdata)
 }
 
 /**
- * Here we cleanup stdata by deallocating it's members in reverse order of 
+ * Here we cleanup stdata by deallocating it's members in reverse order of
  * allocation.
  */
 #if 0
@@ -474,7 +488,7 @@ stdata_cleanup_old(st_data_t* stdata)
 #endif
 
 /**
- * Here we cleanup stdata by deallocating it's members in reverse order of 
+ * Here we cleanup stdata by deallocating it's members in reverse order of
  * allocation.
  */
 static void
@@ -576,14 +590,22 @@ static void compute_hashes_from_fieldnames(GHashTable *fieldname_indicies, const
 static const guint8 *get_field_data(GSList *src_list, field_info *fi)
 {
   GSList *src_le;
+#ifdef WIRESHARK_1_10_0
+  struct data_source *src;
+#else
   data_source *src;
+#endif
   tvbuff_t *src_tvb;
   gint length, tvbuff_length;
   
   for (src_le = src_list; src_le != NULL; src_le = src_le->next)
     {
       src = src_le->data;
+#ifdef WIRESHARK_1_10_0
+      src_tvb = get_data_source_tvb(src);
+#else
       src_tvb = src->tvb;
+#endif
       if (fi->ds_tvb == src_tvb)
 	{
 	  /*
@@ -751,7 +773,7 @@ static void proto_tree_get_node_field_values(proto_node *node, gpointer data)
 
           //check repr
           if(  fi->rep ){
-            val_str = g_strdup( fi->rep->representation ); 
+            val_str = g_strdup( fi->rep->representation );
 
             g_ptr_array_add(values, val_str);
             
@@ -763,7 +785,7 @@ static void proto_tree_get_node_field_values(proto_node *node, gpointer data)
               //XXX CLEANUP
               //gulong *tmp2 = g_new0(gulong, 1);
               //*tmp2 = tmp_type;
-              // NB: overwrite the previous value 
+              // NB: overwrite the previous value
               g_hash_table_insert(stdata->wtree_types, key, (gpointer)tmp_type);
             }
           else
@@ -795,7 +817,7 @@ static void proto_tree_get_node_field_values(proto_node *node, gpointer data)
         {
           // As a last ditch options, convert the value to a string,
           // and don't bother storing the native type
-          val_str = (gchar *)get_node_field_value_as_string(fi, args->edt); 
+          val_str = (gchar *)get_node_field_value_as_string(fi, args->edt);
           if(strlen(val_str) > 0)
             {
               if(is_wildcard_field)
@@ -988,8 +1010,12 @@ gboolean process_packet(capture_file *cf, gint64 offset, st_data_t *stdata)
   epan_dissect_t edt;
   gboolean passed;
 
+#ifdef WIRESHARK_1_10_0
+  struct wtap_pkthdr *whdr = wtap_phdr(cf->wth);
+#else
   const struct wtap_pkthdr *whdr = wtap_phdr(cf->wth);
   union wtap_pseudo_header *pseudo_header = wtap_pseudoheader(cf->wth);
+#endif
   const guchar *pd = wtap_buf_ptr(cf->wth);
 
   /* Count this packet.
@@ -997,15 +1023,21 @@ gboolean process_packet(capture_file *cf, gint64 offset, st_data_t *stdata)
   */
   cf->count++;
 
+  frame_data_init(&fdata, cf->count, whdr, offset, cum_bytes);
+
   /**
    * Initialize dissector tree
    */
   epan_dissect_init(&edt, TRUE, TRUE);
 
-  frame_data_init(&fdata, cf->count, whdr, offset, cum_bytes);
-
+#ifdef WIRESHARK_1_10_0
+  col_custom_prime_edt(&edt, &cf->cinfo);
+  frame_data_set_before_dissect(&fdata, &cf->elapsed_time,
+                                &first_ts, prev_dis, prev_cap);
+#else
   frame_data_set_before_dissect(&fdata, &cf->elapsed_time,
                                 &first_ts, &prev_dis_ts, &prev_cap_ts);
+#endif
 
   passed = TRUE;
 
@@ -1014,14 +1046,22 @@ gboolean process_packet(capture_file *cf, gint64 offset, st_data_t *stdata)
     epan_dissect_prime_dfilter(&edt, cf->rfcode);
   }
 
+#ifndef WIRESHARK_1_10_0
   tap_queue_init(&edt);
+#endif
 
   /**
    * Run the dissector on this packet
    */
+#ifdef WIRESHARK_1_10_0
+  epan_dissect_run_with_taps(&edt, whdr, pd, &fdata, &cf->cinfo);
+#else
   epan_dissect_run(&edt, pseudo_header, pd, &fdata, NULL);
+#endif
 
+#ifndef WIRESHARK_1_10_0
   tap_push_tapped_queue(&edt);
+#endif
   
   // AB: Run the read filter
   if(cf->rfcode) {
@@ -1032,7 +1072,15 @@ gboolean process_packet(capture_file *cf, gint64 offset, st_data_t *stdata)
   }
 
   if(passed) {
+#ifdef WIRESHARK_1_10_0
+    frame_data_set_after_dissect(&fdata, &cum_bytes);
+    prev_dis_frame = fdata;
+    prev_dis = &prev_dis_frame;
+    prev_cap_frame = fdata;
+    prev_cap = &prev_cap_frame;
+#else
     frame_data_set_after_dissect(&fdata, &cum_bytes, &prev_dis_ts);
+#endif
     
     /* stdata could be NULL if we are just counting packets */
     if(stdata != NULL)
@@ -1040,7 +1088,11 @@ gboolean process_packet(capture_file *cf, gint64 offset, st_data_t *stdata)
   }
 
   epan_dissect_cleanup(&edt);
+#ifdef WIRESHARK_1_10_0
+  frame_data_destroy(&fdata);
+#else
   frame_data_cleanup(&fdata);
+#endif
 
   return passed;
 }
@@ -1130,7 +1182,7 @@ int sharktools_init(void)
    */
 #if (WIRESHARK_1_0_0 || WIRESHARK_1_2_0 || WIRESHARK_1_4_0)
   get_credential_info();
-#elif WIRESHARK_1_8_0
+#elif defined(WIRESHARK_1_8_0) || defined(WIRESHARK_1_10_0)
   init_process_policies();
 #endif
   
@@ -1142,7 +1194,7 @@ int sharktools_init(void)
 #elif WIRESHARK_1_0_0
   epan_init(register_all_protocols, register_all_protocol_handoffs, NULL, NULL,
             failure_message, open_failure_message, read_failure_message);
-#elif (WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_8_0)
+#elif (WIRESHARK_1_2_0 || WIRESHARK_1_4_0 || WIRESHARK_1_8_0 || WIRESHARK_1_10_0)
   epan_init(register_all_protocols, register_all_protocol_handoffs, NULL, NULL,
             failure_message, open_failure_message, read_failure_message, write_failure_message);
 #endif
@@ -1384,7 +1436,7 @@ glong sharktools_get_cb(gchar *filename, gulong nfields, const gchar **fields,
           stdata.tree_values = g_ptr_array_new();
           for(i = 0; i < nfields; i++)
             {
-              g_ptr_array_add( stdata.tree_values, g_ptr_array_new() ); 
+              g_ptr_array_add( stdata.tree_values, g_ptr_array_new() );
             }
 
         }
@@ -1410,6 +1462,14 @@ sharktools_iter_init(st_data_t *stdata, gchar *filename, const gchar *dfilter)
   gchar *cf_name = NULL;
   dfilter_t *rfcode = NULL;
   capture_file *cf;
+
+
+#ifdef WIRESHARK_1_10_0
+  char                *gpf_path, *pf_path;
+  int                  gpf_open_errno, gpf_read_errno;
+  int                  pf_open_errno, pf_read_errno;
+#endif
+
 
   dprintf("%s: entering...\n", __FUNCTION__);
 
@@ -1437,6 +1497,11 @@ sharktools_iter_init(st_data_t *stdata, gchar *filename, const gchar *dfilter)
 
   cf_name = filename;
 
+#ifdef WIRESHARK_1_10_0
+  read_prefs(&gpf_open_errno, &gpf_read_errno, &gpf_path,
+          &pf_open_errno, &pf_read_errno, &pf_path);
+#endif
+
   /* Open pcap file */
   int err;
   if(cf_open(cf, cf_name, FALSE, &err) != CF_OK) {
@@ -1450,6 +1515,10 @@ sharktools_iter_init(st_data_t *stdata, gchar *filename, const gchar *dfilter)
      change it after those operations
   */
   cf->rfcode = rfcode;
+
+#ifdef WIRESHARK_1_10_0
+  build_column_format_array(&cf->cinfo, stdata->nfields, TRUE);
+#endif
 
   dprintf("%s: opened file\n", __FUNCTION__);
 
