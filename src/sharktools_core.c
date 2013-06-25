@@ -243,7 +243,7 @@ cf_status_t cf_open(capture_file *cf, const char *fname, gboolean is_tempfile, i
 
   /* The open succeeded.  Fill in the information for this file. */
 
-#if (WIRESHARK_1_4_0 || WIRESHARK_1_8_0)
+#if (WIRESHARK_1_4_0 || WIRESHARK_1_8_0 || WIRESHARK_1_10_0)
   /* Cleanup all data structures used for dissection. */
   cleanup_dissection();
 #endif
