@@ -763,11 +763,11 @@ static void proto_tree_get_node_field_values(proto_node *node, gpointer data)
           dprintf("string as gnfvas: %s\n", get_node_field_value_as_string(fi, args->edt));
 
           val_str = (gchar *)get_node_field_value_as_string(fi, args->edt);
+          stdata->field_types[actual_index] = type;
 
           g_ptr_array_add(values, val_str);
         }
-
-      if(type == FT_NONE)
+      else if(type == FT_NONE)
         {
           gulong tmp_type = FT_NONE;
 
