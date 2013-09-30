@@ -9,6 +9,7 @@ Linux, however, the installation is more complicated for several reasons:
    /sw and /opt/local, respectively.
 
 2) MacOSX has several "standard" Wireshark installation options:
+   * homebrew
    * MacPorts
    * fink
    * the Wireshark dmg from the wireshark.org website.
@@ -24,6 +25,7 @@ Linux, however, the installation is more complicated for several reasons:
 
 4) There are several options for libraries that sharktools depends on, like
    glib2 and libpcap.  These libraries can be installed using:
+   * homebrew
    * MacPorts
    * fink
 

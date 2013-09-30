@@ -55,14 +55,16 @@
  * Contact: Armen Babikyan, MIT Lincoln Laboratory, <armenb@mit.edu>
  */
 
-#include "sharktools_core.h"
+#define WS_VAR_IMPORT extern
+#include <config.h>
+#include <epan/epan.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <pyshark.h>
 
-#define WS_VAR_IMPORT extern
-#include <epan/epan.h>
+#include "sharktools_core.h"
+#include "pyshark.h"
+
 
 extern char sharktools_errmsg[2048];
 
@@ -660,6 +662,12 @@ PyObject *
 pyshark_Iter_iternext(PyObject *self)
 {
   pyshark_Iter *p = (pyshark_Iter *)self;
+
+  // catch access of iterator after last element (i.e. after the iterator has been cleaned up)
+  if (p->stdata == NULL) {
+      PyErr_SetNone(PyExc_StopIteration);
+      return NULL;
+  }
 
   gboolean pkt_exists = sharktools_iter_next(p->stdata);
   
